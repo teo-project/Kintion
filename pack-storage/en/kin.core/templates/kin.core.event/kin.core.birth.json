@@ -1,0 +1,63 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.birth",
+  "entity": "kin.core.event",
+  "name": "Birth",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "child" },
+    { "field": "@child" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "fields": [
+    { "key": "place", "type": "place", "name": "Place of birth", "history": false, "section": "main" }
+  ],
+  "roles": [
+    {
+      "key": "child",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": null,
+      "forms": { "by": "gender", "male": "Newborn", "female": "Newborn", "default": "Newborn" }
+    },
+    {
+      "key": "mother",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": 1,
+      "forms": { "default": "Mother" }
+    },
+    {
+      "key": "father",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": 1,
+      "forms": { "default": "Father" }
+    }
+  ],
+  "effects": [
+    {
+      "type": "suggest_relationship",
+      "name": "Link to mother",
+      "template": "kin.core.parent_child",
+      "roles": { "mother": "parent", "child": "child" },
+      "anchor": "start"
+    },
+    {
+      "type": "suggest_relationship",
+      "name": "Link to father",
+      "template": "kin.core.parent_child",
+      "roles": { "father": "parent", "child": "child" },
+      "anchor": "start"
+    },
+    {
+      "type": "suggest_period",
+      "name": "Record date of birth",
+      "role": "child",
+      "bound": "start"
+    }
+  ]
+}

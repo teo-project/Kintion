@@ -1,0 +1,2648 @@
+{
+ "records": [
+  {
+   "ref": "fyodor",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Фёдор"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1858
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1920
+    }
+   }
+  },
+  {
+   "ref": "pyotr",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Пётр"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1860,
+     "m": 4
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1931,
+     "m": 2,
+     "d": 17
+    }
+   },
+   "note": "Купец 2-й гильдии, Ярославль"
+  },
+  {
+   "ref": "maria",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Мария"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1864
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1940
+    }
+   }
+  },
+  {
+   "ref": "anna",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Анна"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Кузнецова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1865,
+     "m": 3,
+     "d": 12
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1938
+    }
+   }
+  },
+  {
+   "ref": "evdokia",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Евдокия"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Морозова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1862
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1930
+    }
+   }
+  },
+  {
+   "ref": "grigory",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Григорий"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1890
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1944
+    }
+   }
+  },
+  {
+   "ref": "ivan",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Иван"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1888,
+     "m": 8,
+     "d": 2
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1952,
+     "m": 11,
+     "d": 11
+    }
+   }
+  },
+  {
+   "ref": "elena",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Елена"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Смирнова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1892
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1960
+    }
+   }
+  },
+  {
+   "ref": "nikolai",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Николай"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1905,
+     "m": 5,
+     "d": 19
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1985,
+     "m": 9,
+     "d": 3
+    }
+   },
+   "note": "Инженер-мостостроитель"
+  },
+  {
+   "ref": "zinaida",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Зинаида"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Волкова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1907
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1970
+    }
+   }
+  },
+  {
+   "ref": "boris",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Борис"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1932
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2001
+    }
+   }
+  },
+  {
+   "ref": "sergei",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Сергей"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1915,
+     "m": 1,
+     "d": 7
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1990
+    }
+   }
+  },
+  {
+   "ref": "lidiya",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Лидия"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Зайцева",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1917
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1945,
+     "m": 5
+    }
+   }
+  },
+  {
+   "ref": "tamara",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Тамара"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Белова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1922,
+     "m": 6,
+     "d": 30
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2010
+    }
+   }
+  },
+  {
+   "ref": "akim",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Аким"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Белов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1858
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1925
+    }
+   }
+  },
+  {
+   "ref": "ulyana",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Ульяна"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Белова"
+     },
+     {
+      "value": "Гришина",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1862
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1931
+    }
+   }
+  },
+  {
+   "ref": "semyon",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Семён"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Белов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1890
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1960
+    }
+   }
+  },
+  {
+   "ref": "praskovya",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Прасковья"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Белова"
+     },
+     {
+      "value": "Ершова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1895
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1975
+    }
+   }
+  },
+  {
+   "ref": "vera",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Вера"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1919
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2005
+    }
+   }
+  },
+  {
+   "ref": "mikhail",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Михаил"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Орлов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1915
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1980
+    }
+   }
+  },
+  {
+   "ref": "olga",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Ольга"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1940,
+     "m": 12,
+     "d": 22
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2015
+    }
+   },
+   "note": "Учительница музыки"
+  },
+  {
+   "ref": "andrei",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Андрей"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1950,
+     "m": 2,
+     "d": 14
+    }
+   }
+  },
+  {
+   "ref": "irina",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Ирина"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Соколова"
+     },
+     {
+      "value": "Новикова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1952
+    }
+   }
+  },
+  {
+   "ref": "viktor",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Виктор"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Соколов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1950
+    }
+   }
+  },
+  {
+   "ref": "gennady",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Геннадий"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Новиков"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1925
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1995
+    }
+   }
+  },
+  {
+   "ref": "zoya",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Зоя"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Новикова"
+     },
+     {
+      "value": "Сорокина",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1928
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2001
+    }
+   }
+  },
+  {
+   "ref": "natalia",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Наталья"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Павлова"
+     },
+     {
+      "value": "Лебедева",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1953,
+     "m": 3
+    }
+   }
+  },
+  {
+   "ref": "oleg",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Олег"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Павлов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1950
+    }
+   }
+  },
+  {
+   "ref": "pavel",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Павел"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Орлов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1946
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2019
+    }
+   },
+   "note": "Записан на фамилию отца"
+  },
+  {
+   "ref": "kirill",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Кирилл"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1974
+    }
+   }
+  },
+  {
+   "ref": "dmitry",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Дмитрий"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1972,
+     "m": 10,
+     "d": 9
+    }
+   }
+  },
+  {
+   "ref": "ksenia",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Ксения"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Титова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1974
+    }
+   }
+  },
+  {
+   "ref": "alyona",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Алёна"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Соколова"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1989
+    }
+   }
+  },
+  {
+   "ref": "maksim",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Максим"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Павлов"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1980
+    }
+   }
+  },
+  {
+   "ref": "sonya",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Соня"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Павлова"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1985
+    }
+   }
+  },
+  {
+   "ref": "artyom",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Артём"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1996
+    }
+   }
+  },
+  {
+   "ref": "polina",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Полина"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1999
+    }
+   }
+  },
+  {
+   "ref": "daria",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Дарья"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедева"
+     },
+     {
+      "value": "Ковалёва",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1997,
+     "m": 4,
+     "d": 15
+    }
+   }
+  },
+  {
+   "ref": "pyotr-k",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Пётр"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Ковалёв"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1940
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2012
+    }
+   }
+  },
+  {
+   "ref": "nina",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Нина"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Ковалёва"
+     },
+     {
+      "value": "Лаптева",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1943
+    }
+   }
+  },
+  {
+   "ref": "igor",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Игорь"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Ковалёв"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1968
+    }
+   }
+  },
+  {
+   "ref": "marina",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Марина"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Ковалёва"
+     },
+     {
+      "value": "Егорова",
+      "note": "девичья"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1970
+    }
+   }
+  },
+  {
+   "ref": "lev",
+   "entity": "kin.core.person",
+   "groups": [
+    "$G_LEBEDEV"
+   ],
+   "fields": {
+    "name": [
+     {
+      "value": "Лев"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Лебедев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 2022,
+     "m": 6,
+     "d": 1
+    }
+   },
+   "note": "Младший в семье"
+  },
+  {
+   "ref": "pc1",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc2",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-fyodor",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1886
+    }
+   }
+  },
+  {
+   "ref": "pc3",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc4",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc5",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc6",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-pyotr",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1885
+    }
+   }
+  },
+  {
+   "ref": "pc7",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc8",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc9",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc10",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-ivan",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1912
+    }
+   }
+  },
+  {
+   "ref": "pc11",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc12",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-nik1",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1930
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1970
+    }
+   }
+  },
+  {
+   "ref": "pc13",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc14",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-nik2",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1972
+    }
+   }
+  },
+  {
+   "ref": "pc15",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc16",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-sergei1",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1938
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1945
+    }
+   }
+  },
+  {
+   "ref": "pc17",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc18",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc19",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc20",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-sergei2",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1948
+    }
+   }
+  },
+  {
+   "ref": "pc21",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc22",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-akim",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1886
+    }
+   }
+  },
+  {
+   "ref": "pc23",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc24",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-novikov",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1949
+    }
+   }
+  },
+  {
+   "ref": "pc25",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc26",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-koval0",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1965
+    }
+   }
+  },
+  {
+   "ref": "pc27",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc28",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-belov",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1919
+    }
+   }
+  },
+  {
+   "ref": "pc29",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc30",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc31",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc32",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-andrei",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1971
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1985
+    }
+   }
+  },
+  {
+   "ref": "pc33",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc34",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-irina2",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1987
+    }
+   }
+  },
+  {
+   "ref": "pc35",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc36",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc37",
+   "template": "kin.core.parent_child",
+   "fields": {
+    "kind": [
+     {
+      "value": "adopted"
+     }
+    ]
+   }
+  },
+  {
+   "ref": "pc38",
+   "template": "kin.core.parent_child",
+   "fields": {
+    "kind": [
+     {
+      "value": "adopted"
+     }
+    ]
+   }
+  },
+  {
+   "ref": "u-natalia",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1978
+    }
+   }
+  },
+  {
+   "ref": "pc39",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc40",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc41",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc42",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-dmitry",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1995
+    }
+   }
+  },
+  {
+   "ref": "pc43",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc44",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-koval",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1994
+    }
+   }
+  },
+  {
+   "ref": "pc45",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc46",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "u-artyom",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 2020
+    }
+   }
+  },
+  {
+   "ref": "pc47",
+   "template": "kin.core.parent_child",
+   "fields": {
+    "kind": [
+     {
+      "value": "step"
+     }
+    ]
+   }
+  },
+  {
+   "ref": "pc48",
+   "template": "kin.core.parent_child",
+   "fields": {
+    "kind": [
+     {
+      "value": "guardian"
+     }
+    ]
+   }
+  },
+  {
+   "ref": "sib-top",
+   "template": "kin.core.sibling"
+  }
+ ],
+ "participants": [
+  {
+   "container": "pc1",
+   "entity": "fyodor",
+   "role": "parent"
+  },
+  {
+   "container": "pc1",
+   "entity": "grigory",
+   "role": "child"
+  },
+  {
+   "container": "pc2",
+   "entity": "evdokia",
+   "role": "parent"
+  },
+  {
+   "container": "pc2",
+   "entity": "grigory",
+   "role": "child"
+  },
+  {
+   "container": "u-fyodor",
+   "entity": "fyodor",
+   "role": "partner"
+  },
+  {
+   "container": "u-fyodor",
+   "entity": "evdokia",
+   "role": "partner"
+  },
+  {
+   "container": "pc3",
+   "entity": "pyotr",
+   "role": "parent"
+  },
+  {
+   "container": "pc3",
+   "entity": "ivan",
+   "role": "child"
+  },
+  {
+   "container": "pc4",
+   "entity": "anna",
+   "role": "parent"
+  },
+  {
+   "container": "pc4",
+   "entity": "ivan",
+   "role": "child"
+  },
+  {
+   "container": "pc5",
+   "entity": "pyotr",
+   "role": "parent"
+  },
+  {
+   "container": "pc5",
+   "entity": "nikolai",
+   "role": "child"
+  },
+  {
+   "container": "pc6",
+   "entity": "anna",
+   "role": "parent"
+  },
+  {
+   "container": "pc6",
+   "entity": "nikolai",
+   "role": "child"
+  },
+  {
+   "container": "u-pyotr",
+   "entity": "pyotr",
+   "role": "partner"
+  },
+  {
+   "container": "u-pyotr",
+   "entity": "anna",
+   "role": "partner"
+  },
+  {
+   "container": "pc7",
+   "entity": "ivan",
+   "role": "parent"
+  },
+  {
+   "container": "pc7",
+   "entity": "sergei",
+   "role": "child"
+  },
+  {
+   "container": "pc8",
+   "entity": "elena",
+   "role": "parent"
+  },
+  {
+   "container": "pc8",
+   "entity": "sergei",
+   "role": "child"
+  },
+  {
+   "container": "pc9",
+   "entity": "ivan",
+   "role": "parent"
+  },
+  {
+   "container": "pc9",
+   "entity": "vera",
+   "role": "child"
+  },
+  {
+   "container": "pc10",
+   "entity": "elena",
+   "role": "parent"
+  },
+  {
+   "container": "pc10",
+   "entity": "vera",
+   "role": "child"
+  },
+  {
+   "container": "u-ivan",
+   "entity": "ivan",
+   "role": "partner"
+  },
+  {
+   "container": "u-ivan",
+   "entity": "elena",
+   "role": "partner"
+  },
+  {
+   "container": "pc11",
+   "entity": "nikolai",
+   "role": "parent"
+  },
+  {
+   "container": "pc11",
+   "entity": "boris",
+   "role": "child"
+  },
+  {
+   "container": "pc12",
+   "entity": "zinaida",
+   "role": "parent"
+  },
+  {
+   "container": "pc12",
+   "entity": "boris",
+   "role": "child"
+  },
+  {
+   "container": "u-nik1",
+   "entity": "nikolai",
+   "role": "partner"
+  },
+  {
+   "container": "u-nik1",
+   "entity": "zinaida",
+   "role": "partner"
+  },
+  {
+   "container": "pc13",
+   "entity": "nikolai",
+   "role": "parent"
+  },
+  {
+   "container": "pc13",
+   "entity": "kirill",
+   "role": "child"
+  },
+  {
+   "container": "pc14",
+   "entity": "olga",
+   "role": "parent"
+  },
+  {
+   "container": "pc14",
+   "entity": "kirill",
+   "role": "child"
+  },
+  {
+   "container": "u-nik2",
+   "entity": "nikolai",
+   "role": "partner"
+  },
+  {
+   "container": "u-nik2",
+   "entity": "olga",
+   "role": "partner"
+  },
+  {
+   "container": "pc15",
+   "entity": "sergei",
+   "role": "parent"
+  },
+  {
+   "container": "pc15",
+   "entity": "olga",
+   "role": "child"
+  },
+  {
+   "container": "pc16",
+   "entity": "lidiya",
+   "role": "parent"
+  },
+  {
+   "container": "pc16",
+   "entity": "olga",
+   "role": "child"
+  },
+  {
+   "container": "u-sergei1",
+   "entity": "sergei",
+   "role": "partner"
+  },
+  {
+   "container": "u-sergei1",
+   "entity": "lidiya",
+   "role": "partner"
+  },
+  {
+   "container": "pc17",
+   "entity": "sergei",
+   "role": "parent"
+  },
+  {
+   "container": "pc17",
+   "entity": "andrei",
+   "role": "child"
+  },
+  {
+   "container": "pc18",
+   "entity": "tamara",
+   "role": "parent"
+  },
+  {
+   "container": "pc18",
+   "entity": "andrei",
+   "role": "child"
+  },
+  {
+   "container": "pc19",
+   "entity": "sergei",
+   "role": "parent"
+  },
+  {
+   "container": "pc19",
+   "entity": "natalia",
+   "role": "child"
+  },
+  {
+   "container": "pc20",
+   "entity": "tamara",
+   "role": "parent"
+  },
+  {
+   "container": "pc20",
+   "entity": "natalia",
+   "role": "child"
+  },
+  {
+   "container": "u-sergei2",
+   "entity": "sergei",
+   "role": "partner"
+  },
+  {
+   "container": "u-sergei2",
+   "entity": "tamara",
+   "role": "partner"
+  },
+  {
+   "container": "pc21",
+   "entity": "akim",
+   "role": "parent"
+  },
+  {
+   "container": "pc21",
+   "entity": "semyon",
+   "role": "child"
+  },
+  {
+   "container": "pc22",
+   "entity": "ulyana",
+   "role": "parent"
+  },
+  {
+   "container": "pc22",
+   "entity": "semyon",
+   "role": "child"
+  },
+  {
+   "container": "u-akim",
+   "entity": "akim",
+   "role": "partner"
+  },
+  {
+   "container": "u-akim",
+   "entity": "ulyana",
+   "role": "partner"
+  },
+  {
+   "container": "pc23",
+   "entity": "gennady",
+   "role": "parent"
+  },
+  {
+   "container": "pc23",
+   "entity": "irina",
+   "role": "child"
+  },
+  {
+   "container": "pc24",
+   "entity": "zoya",
+   "role": "parent"
+  },
+  {
+   "container": "pc24",
+   "entity": "irina",
+   "role": "child"
+  },
+  {
+   "container": "u-novikov",
+   "entity": "gennady",
+   "role": "partner"
+  },
+  {
+   "container": "u-novikov",
+   "entity": "zoya",
+   "role": "partner"
+  },
+  {
+   "container": "pc25",
+   "entity": "pyotr-k",
+   "role": "parent"
+  },
+  {
+   "container": "pc25",
+   "entity": "igor",
+   "role": "child"
+  },
+  {
+   "container": "pc26",
+   "entity": "nina",
+   "role": "parent"
+  },
+  {
+   "container": "pc26",
+   "entity": "igor",
+   "role": "child"
+  },
+  {
+   "container": "u-koval0",
+   "entity": "pyotr-k",
+   "role": "partner"
+  },
+  {
+   "container": "u-koval0",
+   "entity": "nina",
+   "role": "partner"
+  },
+  {
+   "container": "pc27",
+   "entity": "semyon",
+   "role": "parent"
+  },
+  {
+   "container": "pc27",
+   "entity": "tamara",
+   "role": "child"
+  },
+  {
+   "container": "pc28",
+   "entity": "praskovya",
+   "role": "parent"
+  },
+  {
+   "container": "pc28",
+   "entity": "tamara",
+   "role": "child"
+  },
+  {
+   "container": "u-belov",
+   "entity": "semyon",
+   "role": "partner"
+  },
+  {
+   "container": "u-belov",
+   "entity": "praskovya",
+   "role": "partner"
+  },
+  {
+   "container": "pc29",
+   "entity": "vera",
+   "role": "parent"
+  },
+  {
+   "container": "pc29",
+   "entity": "pavel",
+   "role": "child"
+  },
+  {
+   "container": "pc30",
+   "entity": "mikhail",
+   "role": "parent"
+  },
+  {
+   "container": "pc30",
+   "entity": "pavel",
+   "role": "child"
+  },
+  {
+   "container": "pc31",
+   "entity": "andrei",
+   "role": "parent"
+  },
+  {
+   "container": "pc31",
+   "entity": "dmitry",
+   "role": "child"
+  },
+  {
+   "container": "pc32",
+   "entity": "irina",
+   "role": "parent"
+  },
+  {
+   "container": "pc32",
+   "entity": "dmitry",
+   "role": "child"
+  },
+  {
+   "container": "u-andrei",
+   "entity": "andrei",
+   "role": "partner"
+  },
+  {
+   "container": "u-andrei",
+   "entity": "irina",
+   "role": "partner"
+  },
+  {
+   "container": "pc33",
+   "entity": "irina",
+   "role": "parent"
+  },
+  {
+   "container": "pc33",
+   "entity": "alyona",
+   "role": "child"
+  },
+  {
+   "container": "pc34",
+   "entity": "viktor",
+   "role": "parent"
+  },
+  {
+   "container": "pc34",
+   "entity": "alyona",
+   "role": "child"
+  },
+  {
+   "container": "u-irina2",
+   "entity": "irina",
+   "role": "partner"
+  },
+  {
+   "container": "u-irina2",
+   "entity": "viktor",
+   "role": "partner"
+  },
+  {
+   "container": "pc35",
+   "entity": "natalia",
+   "role": "parent"
+  },
+  {
+   "container": "pc35",
+   "entity": "maksim",
+   "role": "child"
+  },
+  {
+   "container": "pc36",
+   "entity": "oleg",
+   "role": "parent"
+  },
+  {
+   "container": "pc36",
+   "entity": "maksim",
+   "role": "child"
+  },
+  {
+   "container": "pc37",
+   "entity": "natalia",
+   "role": "parent"
+  },
+  {
+   "container": "pc37",
+   "entity": "sonya",
+   "role": "child"
+  },
+  {
+   "container": "pc38",
+   "entity": "oleg",
+   "role": "parent"
+  },
+  {
+   "container": "pc38",
+   "entity": "sonya",
+   "role": "child"
+  },
+  {
+   "container": "u-natalia",
+   "entity": "natalia",
+   "role": "partner"
+  },
+  {
+   "container": "u-natalia",
+   "entity": "oleg",
+   "role": "partner"
+  },
+  {
+   "container": "pc39",
+   "entity": "dmitry",
+   "role": "parent"
+  },
+  {
+   "container": "pc39",
+   "entity": "artyom",
+   "role": "child"
+  },
+  {
+   "container": "pc40",
+   "entity": "ksenia",
+   "role": "parent"
+  },
+  {
+   "container": "pc40",
+   "entity": "artyom",
+   "role": "child"
+  },
+  {
+   "container": "pc41",
+   "entity": "dmitry",
+   "role": "parent"
+  },
+  {
+   "container": "pc41",
+   "entity": "polina",
+   "role": "child"
+  },
+  {
+   "container": "pc42",
+   "entity": "ksenia",
+   "role": "parent"
+  },
+  {
+   "container": "pc42",
+   "entity": "polina",
+   "role": "child"
+  },
+  {
+   "container": "u-dmitry",
+   "entity": "dmitry",
+   "role": "partner"
+  },
+  {
+   "container": "u-dmitry",
+   "entity": "ksenia",
+   "role": "partner"
+  },
+  {
+   "container": "pc43",
+   "entity": "igor",
+   "role": "parent"
+  },
+  {
+   "container": "pc43",
+   "entity": "daria",
+   "role": "child"
+  },
+  {
+   "container": "pc44",
+   "entity": "marina",
+   "role": "parent"
+  },
+  {
+   "container": "pc44",
+   "entity": "daria",
+   "role": "child"
+  },
+  {
+   "container": "u-koval",
+   "entity": "igor",
+   "role": "partner"
+  },
+  {
+   "container": "u-koval",
+   "entity": "marina",
+   "role": "partner"
+  },
+  {
+   "container": "pc45",
+   "entity": "artyom",
+   "role": "parent"
+  },
+  {
+   "container": "pc45",
+   "entity": "lev",
+   "role": "child"
+  },
+  {
+   "container": "pc46",
+   "entity": "daria",
+   "role": "parent"
+  },
+  {
+   "container": "pc46",
+   "entity": "lev",
+   "role": "child"
+  },
+  {
+   "container": "u-artyom",
+   "entity": "artyom",
+   "role": "partner"
+  },
+  {
+   "container": "u-artyom",
+   "entity": "daria",
+   "role": "partner"
+  },
+  {
+   "container": "pc47",
+   "entity": "viktor",
+   "role": "parent"
+  },
+  {
+   "container": "pc47",
+   "entity": "dmitry",
+   "role": "child"
+  },
+  {
+   "container": "pc48",
+   "entity": "vera",
+   "role": "parent"
+  },
+  {
+   "container": "pc48",
+   "entity": "boris",
+   "role": "child"
+  },
+  {
+   "container": "sib-top",
+   "entity": "fyodor",
+   "role": "sibling"
+  },
+  {
+   "container": "sib-top",
+   "entity": "pyotr",
+   "role": "sibling"
+  },
+  {
+   "container": "sib-top",
+   "entity": "maria",
+   "role": "sibling"
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+# Тулбокс разработчика (Д-2): Go-инструменты в контейнере.
+#   docker compose -f deploy/compose.dev.yml run --rm tools sh -c "go vet ./... && golangci-lint run && go test ./..."
+# testdb поднимается автоматически для интеграционных тестов;
+# остановить всё: docker compose -f deploy/compose.dev.yml down
+name: kintion-dev
+
+services:
+  tools:
+    build:
+      context: .
+      dockerfile: tools.Dockerfile
+    working_dir: /src
+    volumes:
+      - ..:/src
+      - go-mod:/go/pkg/mod
+      - go-cache:/root/.cache
+    environment:
+      # .git рабочей копии может быть недоступен в контейнере (git worktree)
+      GOFLAGS: -buildvcs=false
+      TEO_KIN_TEST_DATABASE_URL: postgres://kintion:kintion@testdb:5432/kintion?sslmode=disable
+      TEO_KIN_TEST_REQUIRE_DB: "1"
+    depends_on:
+      testdb:
+        condition: service_healthy
+
+  testdb:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: kintion
+      POSTGRES_PASSWORD: kintion
+      POSTGRES_DB: kintion
+    # только для проверки внешней БД с хоста; данные — во временной ФС
+    ports:
+      # порт тестовой БД на хосте: TEO_KIN_DEV_DB_PORT (по умолчанию 55432), если занят другим стеком
+      - "127.0.0.1:${TEO_KIN_DEV_DB_PORT:-55432}:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kintion -d kintion"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  go-mod:
+  go-cache:

@@ -1,0 +1,18 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.community",
+  "entity": "kin.core.organization",
+  "name": "Community",
+  "title": [
+    { "field": "name" }
+  ],
+  "sort_by": ["name"],
+  "fields": [
+    { "key": "name",     "type": "text",    "name": "Name",     "history": true,  "section": "main" },
+    { "key": "topic",    "type": "text",    "name": "About",        "history": true,  "section": "main" },
+    { "key": "website",  "type": "url",     "name": "Online", "history": false, "multiple": true, "section": "main" },
+    { "key": "place",    "type": "place",   "name": "Where they meet", "history": true, "section": "additional", "show": "filled" },
+    { "key": "contacts", "type": "contact", "name": "Contacts",     "history": false, "multiple": true, "section": "additional" }
+  ]
+}

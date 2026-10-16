@@ -1,0 +1,64 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.relationship",
+  "entity": "kin.core.relationship",
+  "name": "Couple",
+  "links_rank": 10,
+  "title": [
+    { "freeedit": true },
+    { "field": "@stage" },
+    { "template-property": "name", "not": "stage" }
+  ],
+  "roles": [
+    {
+      "key": "partner",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": null,
+      "forms": { "by": "gender", "male": "Partner", "female": "Partner", "default": "Partner" }
+    }
+  ],
+  "stages": [
+    {
+      "key": "flirt",
+      "name": "Flirting",
+      "next": ["dating"],
+      "forms": { "partner": { "by": "gender", "male": "Love interest", "female": "Love interest", "default": "Love interest" } }
+    },
+    {
+      "key": "dating",
+      "name": "Dating",
+      "next": ["cohabitation", "marriage"],
+      "forms": { "partner": { "by": "gender", "male": "Boyfriend", "female": "Girlfriend", "default": "Partner" } }
+    },
+    {
+      "key": "cohabitation",
+      "name": "Cohabitation",
+      "next": ["marriage"],
+      "forms": { "partner": { "by": "gender", "male": "Partner", "female": "Partner", "default": "Partner" } }
+    },
+    {
+      "key": "marriage",
+      "name": "Marriage",
+      "next": [],
+      "forms": { "partner": { "by": "gender", "male": "Husband", "female": "Wife", "default": "Spouse" } },
+      "meta": [
+        { "key": "registration_place", "name": "Registration place", "editor": "text" }
+      ],
+      "end_events": ["kin.core.divorce", "kin.core.death"]
+    },
+    {
+      "key": "default",
+      "forms": { "partner": { "default": "Partner" } }
+    }
+  ],
+  "tree_link": true,
+  "ui": {
+    "quick_add": [
+      { "name": "Add husband", "for": { "gender": "female" }, "role": "partner", "new_role": "partner", "new": { "gender": "male" },   "stage": "marriage", "single": true },
+      { "name": "Add wife", "for": { "gender": "male" },   "role": "partner", "new_role": "partner", "new": { "gender": "female" }, "stage": "marriage", "single": true },
+      { "name": "Add spouse", "for": { "gender": null },  "role": "partner", "new_role": "partner", "new": {},                     "stage": "marriage", "single": true }
+    ]
+  }
+}

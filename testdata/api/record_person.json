@@ -1,0 +1,36 @@
+{
+  "record": {
+    "custom_fields": [],
+    "deleted": false,
+    "end": null,
+    "entity": "kin.core.person",
+    "fields": {},
+    "groups": [],
+    "id": "<id-00>",
+    "note": "по паспорту 1923",
+    "participants": [],
+    "participates_in": [],
+    "revs": {
+      "custom_fields": 0,
+      "end": 0,
+      "groups": 0,
+      "note": 0,
+      "sensitive": 0,
+      "start": 0,
+      "title": 0
+    },
+    "sensitive": false,
+    "start": {
+      "link": null,
+      "value": {
+        "d": 12,
+        "m": 3,
+        "y": 1985
+      }
+    },
+    "template": "kin.core.person",
+    "template_id": "<id-01>",
+    "title_manual": null
+  },
+  "related": {}
+}

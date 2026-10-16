@@ -1,0 +1,21 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.lineage",
+  "entity": "test.alt.bond",
+  "name": "Происхождение",
+  "title": [ { "freeedit": true }, { "template-property": "name" } ],
+  "roles": [
+    { "key": "source", "entities": ["test.alt.being"], "min": 1, "max": 1,
+      "forms": { "by": "kind", "sun": "Отец-светило", "moon": "Мать-луна", "default": "Исток" } },
+    { "key": "offspring", "entities": ["test.alt.being"], "min": 1, "max": 1,
+      "forms": { "by": "kind", "sun": "Сын", "moon": "Дочь", "default": "Потомок" } }
+  ],
+  "ui": {
+    "quick_add": [
+      { "name": "Добавить исток-светило", "role": "offspring", "new_role": "source", "new": { "kind": "sun", "clan": { "field": "clan[-1]" } }, "single": true },
+      { "name": "Добавить исток-луну",    "role": "offspring", "new_role": "source", "new": { "kind": "moon", "clan": { "field": "clan[-1]" } }, "single": true },
+      { "name": "Добавить потомка",       "role": "source", "new_role": "offspring", "new": { "clan": { "field": "clan" } }, "single": false }
+    ]
+  }
+}

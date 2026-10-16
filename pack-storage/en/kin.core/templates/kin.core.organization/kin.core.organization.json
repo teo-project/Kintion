@@ -1,0 +1,43 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.organization",
+  "entity": "kin.core.organization",
+  "name": "Organization",
+  "title": [
+    { "field": "name" },
+    { "string": " ", "if": "legal_form" },
+    { "field": "@legal_form" }
+  ],
+  "sort_by": ["name"],
+  "fields": [
+    { "key": "name",           "type": "text",    "name": "Name",          "history": true,  "section": "main" },
+    { "key": "legal_form", "type": "choice", "free": true, "localized_options": true, "name": "Legal form", "history": true, "section": "main", "options": [{ "key": "llc", "name": "LLC" }, { "key": "inc", "name": "Inc." }, { "key": "corp", "name": "Corp." }, { "key": "sole", "name": "Sole proprietorship" }, { "key": "lp", "name": "LP" }, { "key": "llp", "name": "LLP" }, { "key": "plc", "name": "PLC" }, { "key": "ltd", "name": "Ltd" }, { "key": "gmbh", "name": "GmbH" }, { "key": "ag", "name": "AG" }, { "key": "sa", "name": "SA" }, { "key": "sas", "name": "SAS" }, { "key": "sarl", "name": "SARL" }, { "key": "bv", "name": "BV" }, { "key": "nv", "name": "NV" }, { "key": "srl", "name": "S.r.l." }, { "key": "spa", "name": "S.p.A." }, { "key": "nonprofit", "name": "Nonprofit" }] },
+    { "key": "director",       "type": "contact", "name": "Director",          "history": true,  "section": "main", "show": "filled" },
+    { "key": "phone",          "type": "phone",   "name": "Phone",           "history": false, "multiple": true, "section": "main" },
+    { "key": "email",          "type": "email",   "name": "Email",             "history": false, "multiple": true, "section": "main" },
+    { "key": "website",        "type": "url",     "name": "Website",              "history": false, "multiple": true, "section": "main" },
+    { "key": "contacts",       "type": "contact", "name": "Contacts",          "history": false, "multiple": true, "section": "additional" },
+    { "key": "legal_address",  "type": "place",   "name": "Registered address", "history": true,  "section": "additional" },
+    { "key": "actual_address", "type": "place",   "name": "Actual address", "history": true,  "section": "main" },
+    {
+      "key": "office",
+      "type": "place",
+      "name": "Office",
+      "history": false,
+      "multiple": true,
+      "section": "additional",
+      "meta": [
+        { "key": "label", "name": "Office name", "editor": "text" }
+      ]
+    },
+    { "key": "ein", "type": "text", "name": "EIN (USA)", "history": true, "section": "additional", "show": "filled" },
+    { "key": "vat_id", "type": "text", "name": "VAT ID (EU)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "company_number", "type": "text", "name": "Company number (UK)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "business_number", "type": "text", "name": "Business Number (Canada)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "rfc", "type": "text", "name": "RFC (Mexico)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "abn", "type": "text", "name": "ABN (Australia)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "siren", "type": "text", "name": "SIREN (France)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "handelsregister", "type": "text", "name": "Handelsregister number (Germany)", "history": true, "section": "additional", "show": "filled", "localized_field": true }
+  ]
+}

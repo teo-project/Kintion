@@ -1,0 +1,33 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.christian.orthodox",
+  "id": "kin.christian.orthodox.church_dissolution",
+  "entity": "kin.core.event",
+  "name": "Церковное расторжение брака",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "spouse" },
+    { "field": "@spouse" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "roles": [
+    {
+      "key": "spouse",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Бывший муж", "female": "Бывшая жена", "default": "Бывший супруг" }
+    }
+  ],
+  "effects": [
+    {
+      "type": "suggest_end",
+      "name": "Завершить церковный брак",
+      "template": "kin.christian.orthodox.church_marriage",
+      "roles": { "spouse": "spouse" },
+      "anchor": "end"
+    }
+  ]
+}

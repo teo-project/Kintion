@@ -1,0 +1,19 @@
+{
+  "format": "kintion-pack/0",
+  "id": "test.alt",
+  "version": "0.0.1",
+  "language": "xx",
+  "name": "Синтетический пак",
+  "description": "Проверка «пакам — данные» (план 0.1, §3 п.7): другие ключи полей, ролей, этапов и признака формы. Код должен работать на нём без правок.",
+  "requires": [],
+  "files": [
+    "entities/test.alt.being.json",
+    "entities/test.alt.bond.json",
+    "entities/test.alt.happening.json",
+    "templates/test.alt.being/test.alt.being.json",
+    "templates/test.alt.bond/test.alt.bond.json",
+    "templates/test.alt.bond/test.alt.lineage.json",
+    "templates/test.alt.happening/test.alt.happening.json",
+    "templates/test.alt.happening/test.alt.union_rite.json"
+  ]
+}

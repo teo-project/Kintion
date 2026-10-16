@@ -1,0 +1,34 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.divorce",
+  "entity": "kin.core.event",
+  "name": "Развод",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "partner" },
+    { "field": "@partner" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "roles": [
+    {
+      "key": "partner",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Бывший муж", "female": "Бывшая жена", "default": "Бывший супруг" }
+    }
+  ],
+  "effects": [
+    {
+      "type": "suggest_end",
+      "name": "Завершить брак",
+      "template": "kin.core.relationship",
+      "stage": "marriage",
+      "roles": { "partner": "partner" },
+      "anchor": "end"
+    }
+  ]
+}

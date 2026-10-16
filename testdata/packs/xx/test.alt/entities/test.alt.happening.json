@@ -1,0 +1,9 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.happening",
+  "name": "Случай",
+  "participant": true,
+  "container": true,
+  "period": { "start": "Когда", "end": null }
+}

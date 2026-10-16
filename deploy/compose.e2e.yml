@@ -1,0 +1,19 @@
+# Сквозной тест (T27): установка из compose.yml в отдельном проекте, порт
+# 18080, база во временной ФС. Запуск — e2e/run.sh (поднимает, гоняет
+# Playwright, удаляет с томами):
+#   docker compose -f deploy/compose.yml -f deploy/compose.e2e.yml up -d --build --wait
+name: kintion-e2e
+
+services:
+  app:
+    ports: !override
+      - "${KIN_E2E_PORT:-18080}:${KIN_E2E_PORT:-18080}"
+    environment:
+      TEO_KIN_LOG_LEVEL: info
+      TEO_KIN_LANGUAGE: ru
+      TEO_KIN_HTTP_BIND: ${KIN_E2E_PORT:-18080}
+
+  db:
+    volumes: !reset []
+    tmpfs:
+      - /var/lib/postgresql

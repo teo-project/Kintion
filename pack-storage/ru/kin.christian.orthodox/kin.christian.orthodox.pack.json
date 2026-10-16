@@ -1,0 +1,14 @@
+{
+  "format": "kintion-pack/0",
+  "id": "kin.christian.orthodox",
+  "version": "0.1.0",
+  "language": "ru",
+  "name": "Православие",
+  "description": "Венчание, церковный брак и его расторжение.",
+  "requires": ["kin.core"],
+  "files": [
+    "templates/kin.core.event/kin.christian.orthodox.wedding_sacrament.json",
+    "templates/kin.core.event/kin.christian.orthodox.church_dissolution.json",
+    "templates/kin.core.relationship/kin.christian.orthodox.church_marriage.json"
+  ]
+}

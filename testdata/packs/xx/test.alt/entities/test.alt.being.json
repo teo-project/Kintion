@@ -1,0 +1,13 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.being",
+  "name": "Существо",
+  "participant": true,
+  "container": false,
+  "period": { "start": "Появилось", "end": "Исчезло" },
+  "system": {
+    "title": { "name": "Ярлык" },
+    "note":  { "name": "Заметка" }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.wedding",
+  "entity": "kin.core.event",
+  "name": "Свадьба",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "partner" },
+    { "field": "@partner" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "fields": [
+    { "key": "place", "type": "place", "name": "Место", "history": false, "section": "main" }
+  ],
+  "roles": [
+    {
+      "key": "partner",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Жених", "female": "Невеста", "default": "Вступающий в брак" }
+    },
+    {
+      "key": "witness",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "by": "gender", "male": "Свидетель", "female": "Свидетельница", "default": "Свидетель" }
+    },
+    {
+      "key": "guest",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "by": "gender", "male": "Гость", "female": "Гостья", "default": "Гость" }
+    }
+  ],
+  "contains": ["kin.core.registration"],
+  "effects": [
+    {
+      "type": "suggest_relationship",
+      "name": "Начать брак",
+      "template": "kin.core.relationship",
+      "stage": "marriage",
+      "roles": { "partner": "partner" },
+      "anchor": "start"
+    },
+    {
+      "type": "suggest_field_value",
+      "name": "Новая фамилия",
+      "role": "partner",
+      "field": "surname",
+      "anchor": "start"
+    }
+  ]
+}

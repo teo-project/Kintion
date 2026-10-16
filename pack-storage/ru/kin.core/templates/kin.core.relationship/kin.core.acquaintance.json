@@ -1,0 +1,21 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.acquaintance",
+  "entity": "kin.core.relationship",
+  "name": "Знакомство",
+  "links_rank": 70,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "roles": [
+    {
+      "key": "acquaintance",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": null,
+      "forms": { "by": "gender", "male": "Знакомый", "female": "Знакомая", "default": "Знакомый" }
+    }
+  ]
+}

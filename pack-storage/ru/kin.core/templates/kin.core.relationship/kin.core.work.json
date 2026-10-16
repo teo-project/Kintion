@@ -1,0 +1,43 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.work",
+  "entity": "kin.core.relationship",
+  "name": "Работа",
+  "links_rank": 50,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "roles": [
+    {
+      "key": "employer",
+      "entities": ["kin.core.organization"],
+      "min": 0,
+      "max": 1,
+      "forms": { "default": "Работодатель" }
+    },
+    {
+      "key": "colleague",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "default": "Коллега" }
+    },
+    {
+      "key": "manager",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "default": "Руководитель" }
+    },
+    {
+      "key": "subordinate",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "by": "gender", "male": "Подчинённый", "female": "Подчинённая", "default": "Подчинённый" }
+    }
+  ],
+  "participants": { "min": 1, "max": null }
+}

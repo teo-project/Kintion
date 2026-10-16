@@ -1,0 +1,34 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.bond",
+  "entity": "test.alt.bond",
+  "name": "Союз",
+  "title": [
+    { "freeedit": true },
+    { "field": "@stage" },
+    { "template-property": "name", "not": "stage" }
+  ],
+  "roles": [
+    {
+      "key": "ally",
+      "entities": ["test.alt.being"],
+      "min": 2,
+      "max": null,
+      "forms": { "by": "kind", "sun": "Светило", "moon": "Луна", "default": "Союзник" }
+    }
+  ],
+  "stages": [
+    { "key": "oath", "name": "Клятва", "next": ["bound"],
+      "forms": { "ally": { "by": "kind", "sun": "Поклявшийся", "moon": "Поклявшаяся", "default": "Поклявшийся" } } },
+    { "key": "bound", "name": "Связаны", "next": [],
+      "forms": { "ally": { "by": "kind", "sun": "Спутник", "moon": "Спутница", "default": "Спутник" } },
+      "meta": [ { "key": "where", "name": "Где", "editor": "text" } ] },
+    { "key": "default", "forms": { "ally": { "default": "Союзник" } } }
+  ],
+  "ui": {
+    "quick_add": [
+      { "name": "Добавить спутника", "for": { "kind": "moon" }, "role": "ally", "new_role": "ally", "new": { "kind": "sun" }, "stage": "bound", "single": true }
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "format": "kintion-pack/0",
+  "id": "kin.core",
+  "version": "0.1.0",
+  "language": "ru",
+  "name": "Базовый набор",
+  "description": "Люди, организации, семья, пары, друзья, работа, учёба и основные жизненные события.",
+  "requires": [],
+  "files": [
+    "entities/kin.core.person.json",
+    "entities/kin.core.organization.json",
+    "entities/kin.core.relationship.json",
+    "entities/kin.core.event.json",
+    "templates/kin.core.person/kin.core.person.json",
+    "templates/kin.core.organization/kin.core.organization.json",
+    "templates/kin.core.organization/kin.core.community.json",
+    "templates/kin.core.relationship/kin.core.relationship.json",
+    "templates/kin.core.relationship/kin.core.parent_child.json",
+    "templates/kin.core.relationship/kin.core.sibling.json",
+    "templates/kin.core.relationship/kin.core.friend.json",
+    "templates/kin.core.relationship/kin.core.acquaintance.json",
+    "templates/kin.core.relationship/kin.core.commune.json",
+    "templates/kin.core.relationship/kin.core.work.json",
+    "templates/kin.core.relationship/kin.core.study.json",
+    "templates/kin.core.relationship/kin.core.membership.json",
+    "templates/kin.core.event/kin.core.wedding.json",
+    "templates/kin.core.event/kin.core.registration.json",
+    "templates/kin.core.event/kin.core.divorce.json",
+    "templates/kin.core.event/kin.core.birth.json",
+    "templates/kin.core.event/kin.core.death.json"
+  ]
+}

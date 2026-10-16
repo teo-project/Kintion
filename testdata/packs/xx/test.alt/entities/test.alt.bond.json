@@ -1,0 +1,13 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.bond",
+  "name": "Узы",
+  "participant": true,
+  "container": true,
+  "period": { "start": "С", "end": "До" },
+  "stages": "allowed",
+  "system": {
+    "stage": { "name": "Ступень" }
+  }
+}

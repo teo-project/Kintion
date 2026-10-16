@@ -1,0 +1,11 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.happening",
+  "entity": "test.alt.happening",
+  "name": "Случай",
+  "roles": [
+    { "key": "witness_of", "entities": ["test.alt.being"], "min": 0, "max": null, "forms": { "default": "Очевидец" } },
+    { "key": "episode", "entities": ["test.alt.happening"], "min": 0, "max": null, "forms": { "default": "Эпизод" } }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.person",
+  "name": "Человек",
+  "participant": true,
+  "container": false,
+  "period": { "start": "Дата рождения", "end": { "name": "Дата смерти", "show": "filled" } },
+  "system": {
+    "title":     { "name": "Подпись" },
+    "note":      { "name": "Примечание" },
+    "sensitive": { "name": "Чувствительное" },
+    "groups":    { "name": "Группы" }
+  }
+}

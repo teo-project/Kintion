@@ -1,0 +1,50 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.christian.orthodox",
+  "id": "kin.christian.orthodox.wedding_sacrament",
+  "entity": "kin.core.event",
+  "name": "Венчание",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "spouse" },
+    { "field": "@spouse" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "fields": [
+    { "key": "church", "type": "text", "name": "Храм", "history": false, "section": "main" }
+  ],
+  "roles": [
+    {
+      "key": "spouse",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Венчающийся", "female": "Венчающаяся", "default": "Венчающийся" }
+    },
+    {
+      "key": "priest",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "default": "Священник" }
+    },
+    {
+      "key": "sponsor",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "by": "gender", "male": "Поручитель", "female": "Поручительница", "default": "Поручитель" }
+    }
+  ],
+  "effects": [
+    {
+      "type": "suggest_relationship",
+      "name": "Начать церковный брак",
+      "template": "kin.christian.orthodox.church_marriage",
+      "roles": { "spouse": "spouse" },
+      "anchor": "start"
+    }
+  ]
+}

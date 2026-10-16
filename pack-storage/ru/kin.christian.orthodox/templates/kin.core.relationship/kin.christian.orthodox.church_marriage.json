@@ -1,0 +1,23 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.christian.orthodox",
+  "id": "kin.christian.orthodox.church_marriage",
+  "entity": "kin.core.relationship",
+  "name": "Церковный брак",
+  "links_rank": 10,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "roles": [
+    {
+      "key": "spouse",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Муж", "female": "Жена", "default": "Супруг" }
+    }
+  ],
+  "end_events": ["kin.core.death", "kin.christian.orthodox.church_dissolution"],
+  "tree_link": true
+}

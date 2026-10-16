@@ -1,0 +1,15 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.person",
+  "name": "Person",
+  "participant": true,
+  "container": false,
+  "period": { "start": "Date of birth", "end": { "name": "Date of death", "show": "filled" } },
+  "system": {
+    "title":     { "name": "Caption" },
+    "note":      { "name": "Note" },
+    "sensitive": { "name": "Sensitive" },
+    "groups":    { "name": "Groups" }
+  }
+}

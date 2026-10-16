@@ -1,0 +1,22 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.sibling",
+  "entity": "kin.core.relationship",
+  "name": "Sibling",
+  "links_rank": 15,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "roles": [
+    {
+      "key": "sibling",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": null,
+      "forms": { "by": "gender", "male": "Brother", "female": "Sister", "default": "Sibling" }
+    }
+  ],
+  "tree_link": { "as": "siblings" }
+}

@@ -1,0 +1,21 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.friend",
+  "entity": "kin.core.relationship",
+  "name": "Friendship",
+  "links_rank": 40,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "roles": [
+    {
+      "key": "friend",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Friend", "female": "Friend", "default": "Friend" }
+    }
+  ]
+}

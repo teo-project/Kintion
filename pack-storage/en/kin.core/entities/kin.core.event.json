@@ -1,0 +1,17 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.event",
+  "name": "Event",
+  "participant": true,
+  "container": true,
+  "anchor": true,
+  "links": false,
+  "period": { "start": "Date", "end": null },
+  "system": {
+    "title":     { "name": "Caption" },
+    "note":      { "name": "Note" },
+    "sensitive": { "name": "Sensitive" },
+    "groups":    { "name": "Groups" }
+  }
+}

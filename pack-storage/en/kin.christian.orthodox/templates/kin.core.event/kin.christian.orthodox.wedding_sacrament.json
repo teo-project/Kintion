@@ -1,0 +1,50 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.christian.orthodox",
+  "id": "kin.christian.orthodox.wedding_sacrament",
+  "entity": "kin.core.event",
+  "name": "Holy Matrimony",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "spouse" },
+    { "field": "@spouse" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "fields": [
+    { "key": "church", "type": "text", "name": "Church", "history": false, "section": "main" }
+  ],
+  "roles": [
+    {
+      "key": "spouse",
+      "entities": ["kin.core.person"],
+      "min": 2,
+      "max": 2,
+      "forms": { "by": "gender", "male": "Groom", "female": "Bride", "default": "Spouse" }
+    },
+    {
+      "key": "priest",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "default": "Priest" }
+    },
+    {
+      "key": "sponsor",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "by": "gender", "male": "Sponsor", "female": "Sponsor", "default": "Sponsor" }
+    }
+  ],
+  "effects": [
+    {
+      "type": "suggest_relationship",
+      "name": "Start church marriage",
+      "template": "kin.christian.orthodox.church_marriage",
+      "roles": { "spouse": "spouse" },
+      "anchor": "start"
+    }
+  ]
+}

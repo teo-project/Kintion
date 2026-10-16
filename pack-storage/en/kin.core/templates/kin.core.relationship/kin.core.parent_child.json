@@ -1,0 +1,70 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.parent_child",
+  "entity": "kin.core.relationship",
+  "name": "Parent — child",
+  "links_rank": 5,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "fields": [
+    {
+      "key": "kind",
+      "type": "choice",
+      "name": "Type",
+      "history": false,
+      "section": "main",
+      "show": "filled",
+      "options": [
+        { "key": "birth", "name": "Biological" },
+        {
+          "key": "adopted", "name": "Adopted", "tree_line": "dashed",
+          "forms": {
+            "parent": { "by": "gender", "male": "Adoptive father", "female": "Adoptive mother", "default": "Adoptive parent" },
+            "child":  { "by": "gender", "male": "Adopted son", "female": "Adopted daughter", "default": "Adopted child" }
+          }
+        },
+        {
+          "key": "step", "name": "Step", "tree_line": "dashed",
+          "forms": {
+            "parent": { "by": "gender", "male": "Stepfather", "female": "Stepmother", "default": "Stepparent" },
+            "child":  { "by": "gender", "male": "Stepson", "female": "Stepdaughter", "default": "Stepchild" }
+          }
+        },
+        {
+          "key": "guardian", "name": "Guardian", "tree_line": "dashed",
+          "forms": {
+            "parent": { "by": "gender", "male": "Guardian", "female": "Guardian", "default": "Guardian" },
+            "child":  { "by": "gender", "male": "Ward", "female": "Ward", "default": "Ward" }
+          }
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "parent",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": 1,
+      "forms": { "by": "gender", "male": "Father", "female": "Mother", "default": "Parent" }
+    },
+    {
+      "key": "child",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": 1,
+      "forms": { "by": "gender", "male": "Son", "female": "Daughter", "default": "Child" }
+    }
+  ],
+  "tree_link": { "line_by": "kind" },
+  "ui": {
+    "quick_add": [
+      { "name": "Add father",    "role": "child",  "new_role": "parent", "new": { "gender": "male",   "surname": { "field": "surname[-1]" } }, "relation": { "start": { "field": "start" } }, "single": true },
+      { "name": "Add mother",    "role": "child",  "new_role": "parent", "new": { "gender": "female", "surname": { "field": "surname[-1]" } }, "relation": { "start": { "field": "start" } }, "single": true },
+      { "name": "Add child", "role": "parent", "new_role": "child",  "new": { "surname": { "field": "surname" } },                      "single": false }
+    ]
+  }
+}

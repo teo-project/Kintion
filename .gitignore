@@ -1,0 +1,29 @@
+node_modules/
+dist/
+!web/dist/
+web/dist/*
+!web/dist/.gitkeep
+.env
+*.local
+/kintion
+/kintion.exe
+/bin/
+
+# бэкапы deploy/scripts/backup.sh
+/backups/
+
+# сквозной тест
+/e2e/node_modules/
+/e2e/test-results/
+/e2e/playwright-report/
+
+# выгрузка экранов для дизайна (web/scripts/design-export.mjs)
+/design-export/
+
+# макеты из Claude Design (только визуальный ориентир) и выгрузка до рестайла
+/design-import/
+/design-export-before/
+
+# ответы Codex (deploy/scripts/codex-log.sh)
+/codex-log/
+deploy/backups/

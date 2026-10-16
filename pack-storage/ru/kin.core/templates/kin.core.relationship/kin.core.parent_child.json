@@ -1,0 +1,70 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.parent_child",
+  "entity": "kin.core.relationship",
+  "name": "Родитель — ребёнок",
+  "links_rank": 5,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "fields": [
+    {
+      "key": "kind",
+      "type": "choice",
+      "name": "Вид",
+      "history": false,
+      "section": "main",
+      "show": "filled",
+      "options": [
+        { "key": "birth", "name": "Родной" },
+        {
+          "key": "adopted", "name": "Приёмный", "tree_line": "dashed",
+          "forms": {
+            "parent": { "by": "gender", "male": "Приёмный отец", "female": "Приёмная мать", "default": "Приёмный родитель" },
+            "child":  { "by": "gender", "male": "Приёмный сын", "female": "Приёмная дочь", "default": "Приёмный ребёнок" }
+          }
+        },
+        {
+          "key": "step", "name": "Неродной", "tree_line": "dashed",
+          "forms": {
+            "parent": { "by": "gender", "male": "Отчим", "female": "Мачеха", "default": "Неродной родитель" },
+            "child":  { "by": "gender", "male": "Пасынок", "female": "Падчерица", "default": "Неродной ребёнок" }
+          }
+        },
+        {
+          "key": "guardian", "name": "Опекун", "tree_line": "dashed",
+          "forms": {
+            "parent": { "by": "gender", "male": "Опекун", "female": "Опекунша", "default": "Опекун" },
+            "child":  { "by": "gender", "male": "Подопечный", "female": "Подопечная", "default": "Подопечный" }
+          }
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "key": "parent",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": 1,
+      "forms": { "by": "gender", "male": "Папа", "female": "Мама", "default": "Родитель" }
+    },
+    {
+      "key": "child",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": 1,
+      "forms": { "by": "gender", "male": "Сын", "female": "Дочь", "default": "Ребёнок" }
+    }
+  ],
+  "tree_link": { "line_by": "kind" },
+  "ui": {
+    "quick_add": [
+      { "name": "Добавить отца",    "role": "child",  "new_role": "parent", "new": { "gender": "male",   "surname": { "field": "surname[-1]" } }, "relation": { "start": { "field": "start" } }, "single": true },
+      { "name": "Добавить мать",    "role": "child",  "new_role": "parent", "new": { "gender": "female", "surname": { "field": "surname[-1]" } }, "relation": { "start": { "field": "start" } }, "single": true },
+      { "name": "Добавить ребёнка", "role": "parent", "new_role": "child",  "new": { "surname": { "field": "surname" } },                      "single": false }
+    ]
+  }
+}

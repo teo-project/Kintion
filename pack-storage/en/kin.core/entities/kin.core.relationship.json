@@ -1,0 +1,18 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.relationship",
+  "name": "Relationship",
+  "participant": true,
+  "container": true,
+  "links": true,
+  "period": { "start": "Start", "end": "End" },
+  "stages": "allowed",
+  "system": {
+    "stage":     { "name": "Stage" },
+    "title":     { "name": "Caption" },
+    "note":      { "name": "Note" },
+    "sensitive": { "name": "Sensitive" },
+    "groups":    { "name": "Groups" }
+  }
+}

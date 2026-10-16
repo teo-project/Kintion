@@ -1,0 +1,133 @@
+# Kintion: application + PostgreSQL + volumes.
+#   docker compose up -d --build
+# Settings come from .env next to this file (see .env.example).
+name: kintion
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        VERSION: ${TEO_KIN_VERSION:-dev}
+    image: kintion:${TEO_KIN_VERSION:-dev}
+    restart: unless-stopped
+    environment:
+      # external database: set TEO_KIN_DATABASE_URL in .env
+      TEO_KIN_DATABASE_URL: ${TEO_KIN_DATABASE_URL:-postgres://kintion:${TEO_KIN_DB_PASSWORD:-kintion}@db:5432/kintion?sslmode=disable}
+      TEO_KIN_PUBLIC_URL: ${TEO_KIN_PUBLIC_URL:-}
+      TEO_KIN_LOG_LEVEL: ${TEO_KIN_LOG_LEVEL:-info}
+      TEO_KIN_LANGUAGE: ${TEO_KIN_LANGUAGE:-en}
+      TEO_KIN_PACKS: ${TEO_KIN_PACKS:-kin.core}
+      TEO_KIN_AUTH_MODE: ${TEO_KIN_AUTH_MODE:-local}
+      TEO_KIN_REGISTRATION: ${TEO_KIN_REGISTRATION:-closed}
+      TEO_KIN_UPLOAD_MAX_MB: ${TEO_KIN_UPLOAD_MAX_MB:-20}
+      # in Compose this is a port only: it is used on both sides of "ports"
+      TEO_KIN_HTTP_BIND: ${TEO_KIN_HTTP_BIND:-8080}
+    ports:
+      - "${TEO_KIN_HTTP_BIND:-8080}:${TEO_KIN_HTTP_BIND:-8080}"
+    volumes:
+      - kintion-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kintion
+      POSTGRES_PASSWORD: ${TEO_KIN_DB_PASSWORD:-kintion}
+      POSTGRES_DB: kintion
+    # the port is not published: only the application reaches the database
+    volumes:
+      - kintion-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kintion -d kintion"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-command backup:  docker compose run --rm backup
+  # Result: ./backups/<date-time>-<n>/ with db.dump, files.tar.gz and info.txt
+  # (info.txt is written last; while a backup runs the folder ends with .partial).
+  backup:
+    profiles: ["tools"]
+    image: postgres:18-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: &pg
+      PGHOST: db
+      PGUSER: kintion
+      PGDATABASE: kintion
+      PGPASSWORD: ${TEO_KIN_DB_PASSWORD:-kintion}
+      # with an external database these services refuse to run
+      TEO_KIN_DATABASE_URL: ${TEO_KIN_DATABASE_URL:-}
+    volumes:
+      - kintion-data:/data:ro
+      - ./backups:/backups
+    entrypoint: ["sh", "-eu", "-c"]
+    command:
+      - |
+        [ -z "$$TEO_KIN_DATABASE_URL" ] || { echo "external database (TEO_KIN_DATABASE_URL): dump it with your own tools, see docs/deployment.md"; exit 1; }
+        final=/backups/$$(date +%Y%m%d-%H%M%S)-$$$$
+        out="$$final.partial"
+        mkdir -p "$$out"
+        pg_dump -Fc > "$$out/db.dump"
+        tar -czf "$$out/files.tar.gz" -C /data .
+        {
+          echo "created_at=$$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "schema=$$(psql -tAc 'SELECT version FROM schema_info' || echo '?')"
+          echo "app=$$(psql -tAc 'SELECT app_version FROM schema_info' || echo '?')"
+        } > "$$out/info.txt"
+        mv "$$out" "$$final"
+        echo "done: $$final"
+
+  # Restore REPLACES the database and the files with a backup.
+  # Stop "app" first (keep "db" running), then:
+  #   docker compose run --rm restore                      # latest finished backup
+  #   RESTORE_FROM=<folder> docker compose run --rm restore
+  # and start "app" again. A running application makes it refuse
+  # (RESTORE_FORCE=1 skips the check).
+  restore:
+    profiles: ["tools"]
+    image: postgres:18-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *pg
+      RESTORE_FROM: ${RESTORE_FROM:-}
+      RESTORE_FORCE: ${RESTORE_FORCE:-}
+    volumes:
+      - kintion-data:/data
+      - ./backups:/backups:ro
+    entrypoint: ["sh", "-eu", "-c"]
+    command:
+      - |
+        [ -z "$$TEO_KIN_DATABASE_URL" ] || { echo "external database (TEO_KIN_DATABASE_URL): restore it with your own tools, see docs/deployment.md"; exit 1; }
+        src="$$RESTORE_FROM"
+        if [ -z "$$src" ]; then
+          for d in $$(ls -1 /backups | sort); do if [ -f "/backups/$$d/info.txt" ]; then src=$$d; fi; done
+        fi
+        dir="/backups/$$src"
+        [ -n "$$src" ] && [ -f "$$dir/info.txt" ] && [ -f "$$dir/db.dump" ] && [ -f "$$dir/files.tar.gz" ] || { echo "no finished backup: $$dir (need info.txt, db.dump, files.tar.gz)"; exit 1; }
+        pg_restore -l "$$dir/db.dump" > /dev/null
+        tar -tzf "$$dir/files.tar.gz" > /dev/null
+        busy=$$(psql -d postgres -tAc "SELECT count(*) FROM pg_stat_activity WHERE datname = '$$PGDATABASE' AND pid <> pg_backend_pid()")
+        if [ "$$busy" != 0 ] && [ -z "$$RESTORE_FORCE" ]; then
+          echo "the application is connected ($$busy sessions): stop app and retry (RESTORE_FORCE=1 skips the check)"; exit 1
+        fi
+        echo "database <- $$dir/db.dump"
+        dropdb --if-exists --force "$$PGDATABASE"
+        createdb "$$PGDATABASE"
+        pg_restore -d "$$PGDATABASE" --no-owner --exit-on-error "$$dir/db.dump"
+        echo "files <- $$dir/files.tar.gz"
+        find /data -mindepth 1 -delete
+        tar -xzf "$$dir/files.tar.gz" -C /data --numeric-owner
+        echo "done: start app"
+
+volumes:
+  kintion-db:
+  kintion-data:

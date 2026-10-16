@@ -1,0 +1,18 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.union_rite",
+  "entity": "test.alt.happening",
+  "name": "Обряд союза",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "ally" },
+    { "field": "@ally" }
+  ],
+  "fields": [ { "key": "venue", "type": "place", "name": "Место обряда", "history": false, "section": "main" } ],
+  "roles": [
+    { "key": "ally", "entities": ["test.alt.being"], "min": 2, "max": 2,
+      "forms": { "by": "kind", "sun": "Вступающий", "moon": "Вступающая", "default": "Вступающий" } }
+  ]
+}

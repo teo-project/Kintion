@@ -1,0 +1,43 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.work",
+  "entity": "kin.core.relationship",
+  "name": "Work",
+  "links_rank": 50,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "roles": [
+    {
+      "key": "employer",
+      "entities": ["kin.core.organization"],
+      "min": 0,
+      "max": 1,
+      "forms": { "default": "Employer" }
+    },
+    {
+      "key": "colleague",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "default": "Colleague" }
+    },
+    {
+      "key": "manager",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "default": "Manager" }
+    },
+    {
+      "key": "subordinate",
+      "entities": ["kin.core.person"],
+      "min": 0,
+      "max": null,
+      "forms": { "by": "gender", "male": "Subordinate", "female": "Subordinate", "default": "Subordinate" }
+    }
+  ],
+  "participants": { "min": 1, "max": null }
+}

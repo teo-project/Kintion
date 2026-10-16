@@ -1,0 +1,31 @@
+{
+  "format": "kintion-pack/0",
+  "source": "test.alt",
+  "id": "test.alt.being",
+  "entity": "test.alt.being",
+  "name": "Существо",
+  "title": [
+    { "field": "clan" },
+    { "string": ", ", "if": "given" },
+    { "field": "given" }
+  ],
+  "quick_fields": ["given", "clan", ".note", "start"],
+  "fields": [
+    { "key": "given", "type": "text", "name": "Данное имя", "history": true, "section": "main" },
+    { "key": "clan",  "type": "text", "name": "Род",        "history": true, "section": "main" },
+    {
+      "key": "kind",
+      "type": "choice",
+      "name": "Вид",
+      "history": true,
+      "section": "main",
+      "options": [
+        { "key": "sun",  "name": "Солнечный" },
+        { "key": "moon", "name": "Лунный" }
+      ]
+    },
+    { "key": "glyph", "type": "image", "name": "Знак", "history": true, "section": "main",
+      "meta": [ { "key": "crop", "name": "Обрезка", "editor": "crop", "shapes": ["square", "circle"] } ] },
+    { "key": "signal", "type": "phone", "name": "Сигнал", "history": false, "multiple": true, "section": "additional", "show": "filled" }
+  ]
+}

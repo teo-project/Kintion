@@ -1,0 +1,82 @@
+{
+  "record": {
+    "custom_fields": [],
+    "deleted": false,
+    "end": null,
+    "entity": "kin.core.person",
+    "fields": {
+      "gender": {
+        "rev": 0,
+        "values": [
+          {
+            "id": "<id-00>",
+            "links": [],
+            "meta": {},
+            "note": null,
+            "valid_from": null,
+            "valid_to": null,
+            "value": "female"
+          }
+        ]
+      },
+      "name": {
+        "rev": 0,
+        "values": [
+          {
+            "id": "<id-01>",
+            "links": [],
+            "meta": {
+              "bColor": "#e57373"
+            },
+            "note": null,
+            "valid_from": null,
+            "valid_to": null,
+            "value": "Лиза"
+          }
+        ]
+      },
+      "nickname": {
+        "rev": 0,
+        "values": [
+          {
+            "id": "<id-02>",
+            "links": [],
+            "meta": {},
+            "note": null,
+            "valid_from": null,
+            "valid_to": null,
+            "value": "Лиз"
+          },
+          {
+            "id": "<id-03>",
+            "links": [],
+            "meta": {},
+            "note": null,
+            "valid_from": null,
+            "valid_to": null,
+            "value": "Лиса"
+          }
+        ]
+      }
+    },
+    "groups": [],
+    "id": "<id-04>",
+    "note": null,
+    "participants": [],
+    "participates_in": [],
+    "revs": {
+      "custom_fields": 0,
+      "end": 0,
+      "groups": 0,
+      "note": 0,
+      "sensitive": 0,
+      "start": 0,
+      "title": 0
+    },
+    "sensitive": false,
+    "start": null,
+    "template": "kin.core.person",
+    "template_id": "<id-05>",
+    "title_manual": null
+  }
+}

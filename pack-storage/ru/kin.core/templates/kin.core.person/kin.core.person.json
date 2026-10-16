@@ -1,0 +1,71 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.person",
+  "entity": "kin.core.person",
+  "name": "Человек",
+  "title": [
+    { "field": "name" },
+    { "string": " ", "if": "patronymic" },
+    { "field": "patronymic" },
+    { "string": " ", "if": "surname" },
+    { "field": "surname" }
+  ],
+  "tree_title": [
+    { "field": "name" },
+    { "string": " ", "if": "middle_name" },
+    { "field": "middle_name" },
+    { "string": " ", "if": "patronymic" },
+    { "field": "patronymic" },
+    { "string": " ", "if": "surname" },
+    { "field": "surname" },
+    { "pattern": " ({maiden})",
+      "data": { "maiden": { "field": "surname[-1]" } },
+      "if": { "ne": ["surname[0]", "surname[-1]"] } }
+  ],
+  "quick_fields": ["name", "surname", "gender", ".note", "start"],
+  "end_flag": "deceased",
+  "sort_by": ["surname", "name", "patronymic"],
+  "fields": [
+    {
+      "key": "name",
+      "type": "text",
+      "name": "Имя",
+      "history": true,
+      "section": "main",
+      "meta": [
+        { "key": "bColor", "name": "Цвет выделения", "editor": "color", "palette": ["#e57373", "#64b5f6", "#81c784", "#ffd54f"] }
+      ]
+    },
+    { "key": "surname",     "type": "text", "name": "Фамилия",     "history": true, "section": "main", "surname": true },
+    { "key": "patronymic",  "type": "text", "name": "Отчество",    "history": true, "section": "main", "show": "filled" },
+    { "key": "middle_name", "type": "text", "name": "Второе имя",  "history": true, "section": "main", "show": "filled" },
+    { "key": "nickname",    "type": "text", "name": "Ник",         "history": false, "multiple": true, "section": "main", "show": "filled" },
+    {
+      "key": "gender",
+      "type": "choice",
+      "name": "Пол",
+      "history": true,
+      "section": "main",
+      "options": [
+        { "key": "male",   "name": "Мужской" },
+        { "key": "female", "name": "Женский" }
+      ]
+    },
+    { "key": "deceased", "type": "bool", "name": "Умер", "history": false, "section": "main", "show": "filled" },
+    {
+      "key": "photo",
+      "type": "image",
+      "name": "Фото",
+      "history": true,
+      "section": "main",
+      "meta": [
+        { "key": "crop", "name": "Обрезка", "editor": "crop", "shapes": ["square", "circle"] }
+      ]
+    },
+    { "key": "address", "type": "place", "name": "Адрес",   "history": true,  "section": "additional" },
+    { "key": "phone",   "type": "phone", "name": "Телефон", "history": false, "multiple": true, "section": "additional" },
+    { "key": "email",   "type": "email", "name": "Email",   "history": false, "multiple": true, "section": "additional" },
+    { "key": "website", "type": "url",   "name": "Ссылки",  "history": false, "multiple": true, "section": "additional" }
+  ]
+}

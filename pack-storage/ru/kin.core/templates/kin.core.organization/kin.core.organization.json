@@ -1,0 +1,40 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.organization",
+  "entity": "kin.core.organization",
+  "name": "Организация",
+  "title": [
+    { "field": "@legal_form" },
+    { "string": " «", "if": "legal_form" },
+    { "field": "name" },
+    { "string": "»", "if": "legal_form" }
+  ],
+  "sort_by": ["name"],
+  "fields": [
+    { "key": "name",           "type": "text",    "name": "Название",          "history": true,  "section": "main" },
+    { "key": "legal_form", "type": "choice", "free": true, "localized_options": true, "name": "Форма", "history": true, "section": "main", "options": [{ "key": "ooo", "name": "ООО" }, { "key": "ip", "name": "ИП" }, { "key": "ao", "name": "АО" }, { "key": "pao", "name": "ПАО" }, { "key": "nko", "name": "НКО" }, { "key": "ano", "name": "АНО" }, { "key": "gup", "name": "ГУП" }, { "key": "mup", "name": "МУП" }, { "key": "gbu", "name": "ГБУ" }, { "key": "mbu", "name": "МБУ" }, { "key": "fgup", "name": "ФГУП" }, { "key": "tszh", "name": "ТСЖ" }, { "key": "snt", "name": "СНТ" }, { "key": "kfh", "name": "КФХ" }, { "key": "zao", "name": "ЗАО" }, { "key": "oao", "name": "ОАО" }] },
+    { "key": "director",       "type": "contact", "name": "Директор",          "history": true,  "section": "main", "show": "filled" },
+    { "key": "phone",          "type": "phone",   "name": "Телефон",           "history": false, "multiple": true, "section": "main" },
+    { "key": "email",          "type": "email",   "name": "Email",             "history": false, "multiple": true, "section": "main" },
+    { "key": "website",        "type": "url",     "name": "Сайт",              "history": false, "multiple": true, "section": "main" },
+    { "key": "contacts",       "type": "contact", "name": "Контакты",          "history": false, "multiple": true, "section": "additional" },
+    { "key": "legal_address",  "type": "place",   "name": "Юридический адрес", "history": true,  "section": "additional" },
+    { "key": "actual_address", "type": "place",   "name": "Фактический адрес", "history": true,  "section": "main" },
+    {
+      "key": "office",
+      "type": "place",
+      "name": "Офис",
+      "history": false,
+      "multiple": true,
+      "section": "additional",
+      "meta": [
+        { "key": "label", "name": "Название офиса", "editor": "text" }
+      ]
+    },
+    { "key": "inn", "type": "text", "name": "ИНН (Россия)",    "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "iin", "type": "text", "name": "ИИН (Казахстан)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "bin", "type": "text", "name": "БИН (Казахстан)", "history": true, "section": "additional", "show": "filled", "localized_field": true },
+    { "key": "ein", "type": "text", "name": "EIN (США)",       "history": true, "section": "additional", "show": "filled" }
+  ]
+}

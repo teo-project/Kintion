@@ -1,0 +1,24 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.commune",
+  "entity": "kin.core.relationship",
+  "name": "Commune",
+  "links_rank": 45,
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" }
+  ],
+  "fields": [
+    { "key": "place", "type": "place", "name": "Where", "history": true, "section": "main" }
+  ],
+  "roles": [
+    {
+      "key": "member",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": null,
+      "forms": { "by": "gender", "male": "Member", "female": "Member", "default": "Member" }
+    }
+  ]
+}

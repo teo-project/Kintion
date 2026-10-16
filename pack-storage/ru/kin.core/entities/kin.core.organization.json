@@ -1,0 +1,15 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.organization",
+  "name": "Организация",
+  "participant": true,
+  "container": false,
+  "period": { "start": "Основана", "end": "Закрыта" },
+  "system": {
+    "title":     { "name": "Подпись" },
+    "note":      { "name": "Примечание" },
+    "sensitive": { "name": "Чувствительное" },
+    "groups":    { "name": "Группы" }
+  }
+}

@@ -1,0 +1,751 @@
+/*
+ * Токены темы «Ноктюрн» (F-77, F-90). Компоненты берут цвета только отсюда —
+ * никаких жёстко заданных цветов в компонентах. Тёмная тема — главная,
+ * светлая — парная: имена токенов общие, значения меняются. Тема: по умолчанию
+ * системная (prefers-color-scheme); выбор пользователя — атрибут data-theme на <html>.
+ * Описание и таблица компонентов — docs/concepts/interface-style.md.
+ */
+:root {
+  --kin-font-body: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --kin-space-1: 0.25rem;
+  --kin-space-2: 0.5rem;
+  --kin-space-3: 1rem;
+  --kin-space-4: 2rem;
+  --kin-gap-islands: 14px;
+  --kin-radius: 10px;
+  --kin-radius-island: 20px;
+  --kin-radius-pill: 999px;
+  --kin-font-small: 0.875rem;
+  --kin-font-tiny: 0.75rem;
+  --kin-bar-height: 52px;
+  --kin-control-height: 38px;
+  --kin-icon-btn: 32px;
+  --kin-content-max: 1120px;
+
+  color-scheme: light;
+  --kin-color-bg: #f3f4f8;
+  --kin-color-bar: #ffffff;
+  --kin-color-surface: #ffffff;
+  --kin-color-surface-raised: #edf0ff;
+  --kin-color-surface-sunken: #ffffff;
+  --kin-color-border: #e6e8ef;
+  --kin-color-border-strong: #dfe3f1;
+  --kin-color-text: #1b1f2a;
+  --kin-color-text-muted: #5f6675;
+  --kin-color-accent: #3b5bdb;
+  --kin-color-accent-contrast: #ffffff;
+  --kin-color-accent-soft: #e3e8ff;
+  --kin-color-accent-text: #2f49b8;
+  --kin-color-focus: #3b5bdb;
+  --kin-color-brand-2: #e8c872;
+  --kin-color-danger: #d63a3a;
+  --kin-color-danger-text: #b3261e;
+  --kin-color-danger-soft: #fff1f1;
+  --kin-color-success: #1a7f37;
+  /* состояния поля ввода карточки (F-86): изменено, сохранено */
+  --kin-color-dirty: #d4a72c;
+  --kin-color-dirty-soft: #fffbea;
+  --kin-color-saved: #4ac26b;
+  --kin-color-saved-soft: #f1fbf4;
+  --kin-color-overlay: rgb(20 24 40 / 40%);
+  --kin-shadow: 0 8px 24px rgb(20 24 40 / 20%);
+  --kin-shadow-island: 0 1px 2px rgb(20 24 40 / 4%), 0 4px 16px rgb(20 24 40 / 5%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --kin-color-bg: #0e1020;
+    --kin-color-bar: #121528;
+    --kin-color-surface: #161a2e;
+    --kin-color-surface-raised: #1d2240;
+    --kin-color-surface-sunken: #0e1020;
+    --kin-color-border: #222844;
+    --kin-color-border-strong: #2a3260;
+    --kin-color-text: #e8eaf6;
+    --kin-color-text-muted: #8b92b8;
+    --kin-color-accent: #8b9cff;
+    --kin-color-accent-contrast: #0e1020;
+    --kin-color-accent-soft: #232a52;
+    --kin-color-accent-text: #c9d2ff;
+    --kin-color-focus: #a9b6ff;
+    --kin-color-brand-2: #e8c872;
+    --kin-color-danger: #ff6b6b;
+    --kin-color-danger-text: #ff8a96;
+    --kin-color-danger-soft: #2d1519;
+    --kin-color-success: #3fb950;
+    --kin-color-dirty: #d4a72c;
+    --kin-color-dirty-soft: #2a2412;
+    --kin-color-saved: #4ac26b;
+    --kin-color-saved-soft: #12281c;
+    --kin-color-overlay: rgb(8 10 22 / 70%);
+    --kin-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+    --kin-shadow-island: none;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --kin-color-bg: #0e1020;
+  --kin-color-bar: #121528;
+  --kin-color-surface: #161a2e;
+  --kin-color-surface-raised: #1d2240;
+  --kin-color-surface-sunken: #0e1020;
+  --kin-color-border: #222844;
+  --kin-color-border-strong: #2a3260;
+  --kin-color-text: #e8eaf6;
+  --kin-color-text-muted: #8b92b8;
+  --kin-color-accent: #8b9cff;
+  --kin-color-accent-contrast: #0e1020;
+  --kin-color-accent-soft: #232a52;
+  --kin-color-accent-text: #c9d2ff;
+  --kin-color-focus: #a9b6ff;
+  --kin-color-brand-2: #e8c872;
+  --kin-color-danger: #ff6b6b;
+  --kin-color-danger-text: #ff8a96;
+  --kin-color-danger-soft: #2d1519;
+  --kin-color-success: #3fb950;
+  --kin-color-dirty: #d4a72c;
+  --kin-color-dirty-soft: #2a2412;
+  --kin-color-saved: #4ac26b;
+  --kin-color-saved-soft: #12281c;
+  --kin-color-overlay: rgb(8 10 22 / 70%);
+  --kin-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+  --kin-shadow-island: none;
+}
+
+body {
+  margin: 0;
+  color: var(--kin-color-text);
+  background: var(--kin-color-bg);
+  font-family: var(--kin-font-body);
+  font-size: var(--kin-font-small);
+  line-height: 1.45;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--kin-color-accent-text);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--kin-color-focus);
+  outline-offset: 2px;
+}
+
+/* ---- раскладка: страница и острова (F-90) ---- */
+
+.kin-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kin-gap-islands);
+  width: 100%;
+  max-width: calc(var(--kin-content-max) + 2 * var(--kin-space-3));
+  margin: 0 auto;
+  padding: 20px var(--kin-space-3) 48px;
+}
+
+/* основная колонка + узкая правая; на узком экране — одна колонка */
+.kin-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kin-gap-islands);
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .kin-columns {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+.kin-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kin-gap-islands);
+  min-width: 0;
+}
+
+.kin-island {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 20px;
+  background: var(--kin-color-surface);
+  border: 1px solid var(--kin-color-border);
+  border-radius: var(--kin-radius-island);
+  box-shadow: var(--kin-shadow-island);
+}
+
+.kin-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kin-space-2) var(--kin-space-3);
+  align-items: center;
+  min-height: var(--kin-icon-btn);
+}
+
+.kin-page-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.kin-section-title {
+  margin: 0 0 var(--kin-space-2);
+  color: var(--kin-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kin-spacer {
+  flex: 1;
+}
+
+/* ---- кнопки (F-77): текстовые — для выбора из списка и вариантов ответа ---- */
+
+.kin-btn {
+  display: inline-flex;
+  box-sizing: border-box;
+  gap: var(--kin-space-1);
+  align-items: center;
+  min-height: var(--kin-icon-btn);
+  padding: 0 12px;
+  color: var(--kin-color-accent-text);
+  background: var(--kin-color-surface-raised);
+  border: 1px solid transparent;
+  border-radius: var(--kin-radius);
+  font: inherit;
+  font-size: var(--kin-font-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kin-btn:hover:not(:disabled) {
+  border-color: var(--kin-color-border-strong);
+}
+
+.kin-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.kin-btn--primary {
+  color: var(--kin-color-accent-contrast);
+  background: var(--kin-color-accent);
+}
+
+.kin-btn--danger {
+  color: var(--kin-color-danger-text);
+  background: transparent;
+  border-color: var(--kin-color-danger);
+}
+
+.kin-btn--small {
+  min-height: 26px;
+  padding: 0 var(--kin-space-2);
+  font-size: var(--kin-font-tiny);
+}
+
+/* ---- иконка-кнопка 32×32 (F-90): подпись — aria-label и title ---- */
+
+.kin-ibtn {
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  width: var(--kin-icon-btn);
+  height: var(--kin-icon-btn);
+  padding: 0;
+  color: var(--kin-color-accent-text);
+  background: var(--kin-color-surface-raised);
+  border: 1px solid transparent;
+  border-radius: var(--kin-radius);
+  font: inherit;
+  cursor: pointer;
+}
+
+.kin-ibtn:hover:not(:disabled) {
+  border-color: var(--kin-color-border-strong);
+}
+
+.kin-ibtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kin-ibtn--primary {
+  color: var(--kin-color-accent-contrast);
+  background: var(--kin-color-accent);
+}
+
+.kin-ibtn--danger {
+  color: var(--kin-color-danger-text);
+  background: transparent;
+  border-color: var(--kin-color-danger);
+}
+
+.kin-ibtn--ghost {
+  color: var(--kin-color-text-muted);
+  background: transparent;
+}
+
+.kin-ibtn--ghost:hover:not(:disabled) {
+  color: var(--kin-color-accent-text);
+}
+
+.kin-ibtn--sm {
+  width: 26px;
+  height: 26px;
+}
+
+.kin-ibtn--dashed {
+  background: transparent;
+  border: 1px dashed var(--kin-color-border-strong);
+}
+
+/* текст рядом с иконкой — для пунктов меню и «+ поле» в списке */
+.kin-ibtn--wide {
+  gap: 6px;
+  width: auto;
+  padding: 0 10px;
+  font-size: var(--kin-font-tiny);
+  font-weight: 600;
+}
+
+/* полускрытая иконка строки (F-69): видна при наведении на строку или фокусе */
+.kin-icon-btn {
+  display: inline-flex;
+  flex: none;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  color: var(--kin-color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--kin-font-small);
+  cursor: pointer;
+}
+
+.kin-icon-btn:hover:not(:disabled) {
+  color: var(--kin-color-accent-text);
+  background: var(--kin-color-surface-raised);
+}
+
+.kin-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.kin-hover-row .kin-icon-btn.kin-semi {
+  opacity: 0.35;
+}
+
+.kin-hover-row:hover .kin-icon-btn.kin-semi,
+.kin-hover-row:focus-within .kin-icon-btn.kin-semi,
+.kin-icon-btn.kin-semi[data-state='open'] {
+  opacity: 1;
+}
+
+.kin-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kin-icon-btn .kin-icon,
+.kin-ibtn--sm .kin-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- поля ввода ---- */
+
+.kin-input {
+  box-sizing: border-box;
+  min-height: var(--kin-control-height);
+  padding: 0 12px;
+  color: var(--kin-color-text);
+  background: var(--kin-color-surface-sunken);
+  border: 2px solid var(--kin-color-border-strong);
+  border-radius: var(--kin-radius);
+  font: inherit;
+  font-size: var(--kin-font-small);
+  font-weight: 600;
+}
+
+textarea.kin-input {
+  padding: var(--kin-space-2) 12px;
+  line-height: 1.45;
+}
+
+.kin-input::placeholder {
+  color: var(--kin-color-text-muted);
+  font-weight: 500;
+}
+
+.kin-input:focus {
+  border-color: var(--kin-color-focus);
+  outline: none;
+}
+
+.kin-input[aria-invalid='true'] {
+  border-color: var(--kin-color-danger);
+}
+
+.kin-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kin-space-1);
+  color: var(--kin-color-text-muted);
+  font-size: var(--kin-font-tiny);
+  letter-spacing: 0.02em;
+}
+
+.kin-error {
+  margin: var(--kin-space-1) 0;
+  color: var(--kin-color-danger-text);
+  font-size: var(--kin-font-tiny);
+  font-weight: 600;
+}
+
+.kin-notice {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--kin-color-text);
+  background: var(--kin-color-accent-soft);
+  border: 1px solid var(--kin-color-border);
+  border-radius: var(--kin-radius);
+}
+
+.kin-notice--error {
+  background: var(--kin-color-danger-soft);
+  border-color: var(--kin-color-danger);
+}
+
+.kin-muted {
+  color: var(--kin-color-text-muted);
+}
+
+/* метка группы: пилюля */
+.kin-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  color: var(--kin-color-accent-text);
+  background: var(--kin-color-accent-soft);
+  border-radius: var(--kin-radius-pill);
+  font-size: var(--kin-font-tiny);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* ---- вкладки: переключатель сущностей, «Карточка / Изменения» ---- */
+
+.kin-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--kin-color-bg);
+  border-radius: 12px;
+}
+
+.kin-tab {
+  padding: 6px 12px;
+  color: var(--kin-color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  font: inherit;
+  font-size: var(--kin-font-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kin-tab:hover {
+  color: var(--kin-color-text);
+}
+
+.kin-tab[data-state='active'],
+.kin-tab[aria-selected='true'] {
+  color: var(--kin-color-accent-text);
+  background: var(--kin-color-surface-raised);
+}
+
+/* ---- всплывающие формы и диалоги (Reka UI) ---- */
+
+.kin-popover {
+  z-index: 50;
+  box-sizing: border-box;
+  max-width: min(32rem, 95vw);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 14px;
+  color: var(--kin-color-text);
+  background: var(--kin-color-surface);
+  border: 1px solid var(--kin-color-border-strong);
+  border-radius: 14px;
+  box-shadow: var(--kin-shadow);
+  font-size: var(--kin-font-small);
+}
+
+.kin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--kin-color-overlay);
+}
+
+.kin-dialog {
+  position: fixed;
+  top: 10vh;
+  left: 50%;
+  z-index: 50;
+  box-sizing: border-box;
+  width: min(460px, calc(100vw - 2 * var(--kin-space-3)));
+  max-height: 80vh;
+  overflow: auto;
+  padding: 20px;
+  color: var(--kin-color-text);
+  background: var(--kin-color-surface);
+  border: 1px solid var(--kin-color-border);
+  border-radius: var(--kin-radius-island);
+  box-shadow: var(--kin-shadow);
+  font-size: var(--kin-font-small);
+  transform: translateX(-50%);
+}
+
+.kin-dialog > h2:first-child,
+.kin-dialog-title {
+  margin: 0 0 14px;
+  padding-right: 40px;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+/* крест в углу диалога */
+.kin-dialog-x {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+/* действия формы и диалога — иконки справа */
+.kin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kin-space-2);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.kin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 22rem;
+}
+
+.kin-dialog .kin-form {
+  max-width: none;
+}
+
+.kin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kin-space-2);
+  align-items: center;
+}
+
+/*
+ * Окно входа (F-90): «брендовая» панель с деревом всегда тёмная, значения
+ * одинаковы в обеих темах; форма следует теме.
+ */
+.kin-nocturne {
+  --kin-brand-bg: #090b1a;
+  --kin-brand-glow-1: rgb(88 70 214 / 28%);
+  --kin-brand-glow-2: rgb(24 160 172 / 20%);
+  --kin-brand-panel: rgb(22 26 46 / 40%);
+  --kin-brand-panel-border: rgb(255 255 255 / 10%);
+  --kin-brand-text: #e8eaf6;
+  --kin-brand-text-muted: #c3c9e8;
+  --kin-brand-text-faint: #a9b0d6;
+  --kin-brand-accent: #a9b6ff;
+  --kin-tree-line: #3b4690;
+  --kin-tree-card: #141831;
+  --kin-tree-card-line: #2f3868;
+  --kin-tree-avatar: #4d5aa8;
+}
+
+/* поля и формы окна входа: крупнее */
+.kin-nocturne .kin-form {
+  max-width: none;
+  margin-top: var(--kin-space-3);
+}
+
+.kin-nocturne .kin-input {
+  min-height: 2.75rem;
+}
+
+/* ---- select: своя стрелка вместо нативной кнопки (в тёмной теме нативная
+   светлеет при наведении). Стрелка — два градиента цветом из токенов. ---- */
+
+select.kin-input {
+  --kin-select-arrow: var(--kin-color-text-muted);
+  appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--kin-select-arrow) 50%),
+    linear-gradient(135deg, var(--kin-select-arrow) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+select.kin-input:hover,
+select.kin-input:focus {
+  --kin-select-arrow: var(--kin-color-text);
+}
+
+select.kin-input:disabled {
+  --kin-select-arrow: var(--kin-color-text-muted);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---- сегментированный переключатель 50/50 (как «Дерево / Граф» в верхнем меню) ---- */
+
+.kin-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--kin-color-bg);
+  border-radius: calc(var(--kin-radius) + 2px);
+}
+
+.kin-seg .seg-item {
+  flex: 1;
+  padding: 6px 12px;
+  color: var(--kin-color-text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--kin-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kin-seg .seg-item:hover {
+  color: var(--kin-color-text);
+}
+
+.kin-seg .seg-item.active,
+.kin-seg .seg-item[data-state='active'] {
+  color: var(--kin-color-accent-text);
+  background: var(--kin-color-surface-raised);
+}
+
+/* ---- чекбокс (KinCheckbox) ---- */
+
+.kin-check {
+  display: inline-flex;
+  gap: var(--kin-space-2);
+  align-items: center;
+  cursor: pointer;
+}
+
+.kin-check.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.kin-check-box {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--kin-color-accent-contrast);
+  background: var(--kin-color-surface-sunken);
+  border: 2px solid var(--kin-color-border-strong);
+  border-radius: 6px;
+  cursor: inherit;
+}
+
+.kin-check-box:hover:not([data-disabled]) {
+  border-color: var(--kin-color-accent);
+}
+
+.kin-check-box:focus-visible {
+  border-color: var(--kin-color-focus);
+  outline: 2px solid var(--kin-color-focus);
+  outline-offset: 2px;
+}
+
+.kin-check-box[data-state='checked'] {
+  background: var(--kin-color-accent);
+  border-color: var(--kin-color-accent);
+}
+
+.kin-check-mark {
+  display: inline-flex;
+}
+
+.kin-check-mark .kin-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+/* компактные сегменты (поле «да/нет») */
+.kin-seg--compact {
+  display: inline-flex;
+}
+
+.kin-seg--compact .seg-item {
+  flex: none;
+  min-width: 44px;
+  padding: 3px 12px;
+  font-size: var(--kin-font-small);
+}
+
+.kin-seg .seg-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.kin-seg .seg-item:focus-visible {
+  outline: 2px solid var(--kin-color-focus);
+  outline-offset: 1px;
+}

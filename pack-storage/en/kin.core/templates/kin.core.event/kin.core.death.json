@@ -1,0 +1,51 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.death",
+  "entity": "kin.core.event",
+  "name": "Death",
+  "title": [
+    { "freeedit": true },
+    { "template-property": "name" },
+    { "string": " · ", "if": "deceased" },
+    { "field": "@deceased" },
+    { "string": " · ", "if": "start.year" },
+    { "field": "@start.year" }
+  ],
+  "fields": [
+    { "key": "place",  "type": "place", "name": "Place",                  "history": false, "section": "main" },
+    { "key": "ribbon", "type": "bool",    "name": "Mourning ribbon on photo", "history": false, "section": "main", "default": false }
+  ],
+  "roles": [
+    {
+      "key": "deceased",
+      "entities": ["kin.core.person"],
+      "min": 1,
+      "max": 1,
+      "forms": { "by": "gender", "male": "Deceased", "female": "Deceased", "default": "Deceased" }
+    }
+  ],
+  "effects": [
+    {
+      "type": "decorate",
+      "role": "deceased",
+      "style": "mourning_ribbon",
+      "from": "event_date",
+      "when_field": "ribbon"
+    },
+    {
+      "type": "suggest_period",
+      "name": "Record date of death",
+      "role": "deceased",
+      "bound": "end"
+    },
+    {
+      "type": "suggest_end",
+      "name": "End marriage",
+      "template": "kin.core.relationship",
+      "stage": "marriage",
+      "roles": { "deceased": "partner" },
+      "anchor": "end"
+    }
+  ]
+}

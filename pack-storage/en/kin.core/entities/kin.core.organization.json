@@ -1,0 +1,15 @@
+{
+  "format": "kintion-pack/0",
+  "source": "kin.core",
+  "id": "kin.core.organization",
+  "name": "Organization",
+  "participant": true,
+  "container": false,
+  "period": { "start": "Founded", "end": "Closed" },
+  "system": {
+    "title":     { "name": "Caption" },
+    "note":      { "name": "Note" },
+    "sensitive": { "name": "Sensitive" },
+    "groups":    { "name": "Groups" }
+  }
+}
