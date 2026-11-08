@@ -4,7 +4,7 @@
 # Фронтенд и Go собираются на платформе сборщика (Go — кросс-компиляцией под
 # TARGETARCH): многоплатформенный образ (CI, ghcr.io) не гоняет npm и go под эмуляцией.
 
-FROM --platform=$BUILDPLATFORM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:25-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
