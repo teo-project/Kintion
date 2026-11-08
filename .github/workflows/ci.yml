@@ -39,15 +39,15 @@ jobs:
       TEO_KIN_TEST_DATABASE_URL: postgres://kintion:kintion@localhost:5432/kintion?sslmode=disable
       TEO_KIN_TEST_REQUIRE_DB: "1"
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Generated sqlc code is up to date
         run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 diff -f server/internal/db/sqlc.yaml
       - name: go vet
         run: go vet ./...
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0
       - name: go test
@@ -59,8 +59,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -75,8 +75,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [go, web]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -94,7 +94,7 @@ jobs:
       - name: Logs on failure
         if: failure()
         run: docker compose -f deploy/compose.yml -f deploy/compose.e2e.yml logs app
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright
@@ -107,9 +107,9 @@ jobs:
     needs: [go, web]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: deploy/Dockerfile
