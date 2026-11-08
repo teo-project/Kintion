@@ -117,6 +117,9 @@ func (a *API) recordError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, authz.ErrNotFound):
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "не найдено")
+	case errors.Is(err, records.ErrForbidden):
+		// запись видна, но правки нет (гость, F-148): невидимое — по-прежнему 404
+		httpx.WriteError(w, http.StatusForbidden, "forbidden", err.Error())
 	case errors.Is(err, records.ErrDeleted):
 		httpx.WriteError(w, http.StatusConflict, "deleted", err.Error())
 	case errors.Is(err, records.ErrNotDeleted):
@@ -134,8 +137,9 @@ func (a *API) recordError(w http.ResponseWriter, r *http.Request, err error) {
 // recordFn — действие над записью из пути; nil-результат — ответ 204.
 type recordFn func(t *records.Tx, rec *records.Rec) (*records.Rec, error)
 
-// inRecord — запись из пути {id} в транзакции: доступ через authz, видимость
-// шаблона (F-60), действие, ответ с конвертом.
+// inRecord — изменение записи из пути {id} в транзакции: доступ через authz
+// (гостю — видимая запись с правом правки, F-148), видимость шаблона (F-60),
+// действие, ответ с конвертом.
 func (a *API) inRecord(w http.ResponseWriter, r *http.Request, fn recordFn) {
 	sess, _ := SessionFrom(r.Context())
 	id, err := uuid.Parse(r.PathValue("id"))
@@ -146,17 +150,20 @@ func (a *API) inRecord(w http.ResponseWriter, r *http.Request, fn recordFn) {
 	ctx := r.Context()
 	var out *RecordOut
 	err = pgx.BeginFunc(ctx, a.d.Pool, func(tx pgx.Tx) error {
-		row, err := authz.Entity(ctx, sqlc.New(tx), sess.Account.ID, id)
+		row, acc, err := authz.ViewEntity(ctx, sqlc.New(tx), sess.Account.ID, id)
 		if err != nil {
 			return err
 		}
-		t, err := a.rec.Begin(ctx, tx, operation(r, sess.Account.ID), row.DashboardID)
+		t, err := a.rec.BeginAs(ctx, tx, operation(r, sess.Account.ID), acc)
 		if err != nil {
 			return err
 		}
 		rec, err := t.Record(row)
 		if err != nil {
 			return err
+		}
+		if !t.CanEdit(rec.Row.ID) {
+			return records.ErrForbidden
 		}
 		res, err := fn(t, rec)
 		if err != nil || res == nil {
@@ -175,8 +182,39 @@ func (a *API) inRecord(w http.ResponseWriter, r *http.Request, fn recordFn) {
 	}
 }
 
+// getRecord — карточка записи глазами смотрящего: гостю — только видимая
+// запись и видимые соседи (F-05).
 func (a *API) getRecord(w http.ResponseWriter, r *http.Request) {
-	a.inRecord(w, r, func(_ *records.Tx, rec *records.Rec) (*records.Rec, error) { return rec, nil })
+	sess, _ := SessionFrom(r.Context())
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		a.recordError(w, r, authz.ErrNotFound)
+		return
+	}
+	ctx := r.Context()
+	var out *RecordOut
+	err = pgx.BeginTxFunc(ctx, a.d.Pool, pgx.TxOptions{AccessMode: pgx.ReadOnly, IsoLevel: pgx.RepeatableRead}, func(tx pgx.Tx) error {
+		q := sqlc.New(tx)
+		row, acc, err := authz.ViewEntity(ctx, q, sess.Account.ID, id)
+		if err != nil {
+			return err
+		}
+		t, err := a.rec.ReadAs(ctx, q, acc)
+		if err != nil {
+			return err
+		}
+		rec, err := t.Record(row)
+		if err != nil {
+			return err
+		}
+		out, err = recordOut(t, rec)
+		return err
+	})
+	if err != nil {
+		a.recordError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
 func (a *API) patchRecord(w http.ResponseWriter, r *http.Request) {
@@ -211,12 +249,16 @@ func (a *API) operations(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return authz.ErrNotFound
 		}
-		d, err := authz.Dashboard(ctx, q, sess.Account.ID, dashID)
+		acc, err := authz.View(ctx, q, sess.Account.ID, dashID)
 		if err != nil {
 			return err
 		}
+		// гость создаёт при праве правки на свою техническую группу (F-149)
+		if !acc.CanCreate() {
+			return records.ErrForbidden
+		}
 		op := operation(r, sess.Account.ID)
-		t, err := a.rec.Begin(ctx, tx, op, d.ID)
+		t, err := a.rec.BeginAs(ctx, tx, op, acc)
 		if err != nil {
 			return err
 		}
@@ -280,7 +322,12 @@ func (a *API) deleteParticipant(w http.ResponseWriter, r *http.Request) {
 // deleteRecord — в корзину (F-44); в 0.1 удаляет владелец (authz).
 func (a *API) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	sess, _ := SessionFrom(r.Context())
-	a.inRecord(w, r, func(t *records.Tx, rec *records.Rec) (*records.Rec, error) { return t.Delete(rec, sess.Account.ID) })
+	a.inRecord(w, r, func(t *records.Tx, rec *records.Rec) (*records.Rec, error) {
+		if t.Guest() { // удаление — у владельца (F-148)
+			return nil, records.ErrForbidden
+		}
+		return t.Delete(rec, sess.Account.ID)
+	})
 }
 
 func (a *API) restoreRecord(w http.ResponseWriter, r *http.Request) {

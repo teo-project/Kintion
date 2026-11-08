@@ -66,6 +66,13 @@ JSON over HTTP, cookie session with a CSRF token. Main resources (all under `/ap
 | `POST/PATCH/DELETE /records/{id}/fields/{key}/values[/{vid}]` | values of a field |
 | `POST/PATCH/DELETE /records/{id}/participants[/{pid}]` | participation in a relationship or event |
 | `GET/POST/PATCH/DELETE /dashboards/{d}/groups…`, `PUT /records/{id}/groups` | groups |
+| `GET/PUT /dashboards/{d}/eras` | dashboard eras and date ordering |
+| `GET/POST /register`, `PUT /me/nick` | registration and nickname |
+| `GET/POST/DELETE /invites[/{id}]`, `GET/POST /admin/accounts` | registration invitations and account creation |
+| `GET /dashboards/{d}/members`, `PUT /dashboards/{d}/grants` | guests and group permissions |
+| `DELETE /dashboards/{d}/grants/{g}/{acc}`, `DELETE /dashboards/{d}/members/{acc}` | revoke a grant or remove a guest |
+| `GET /invitations`, `POST /invitations/{d}/accept`, `POST /invitations/{d}/decline` | dashboard invitations |
+| `DELETE /dashboards/{d}/membership` | leave a shared dashboard (API only) |
 | `GET /dashboards/{d}/audit` | change log |
 | `POST /dashboards/{d}/files`, `GET /files/{d}/{sha}[/preview]` | files, addressed by content hash |
 | `GET /healthz` | `200` with `"db":"ok"` when the app and the database are up, otherwise `503` |
@@ -74,7 +81,7 @@ Concurrent editing is handled per field: every field has a revision counter, and
 
 ## Principles the code follows
 
-- **Nothing answers differently depending on invisible data.** No uniqueness constraints on domain data; identifiers are UUIDs; counts and search only see what the viewer may see. This keeps the model ready for sharing.
+- **Nothing answers differently depending on invisible data.** No uniqueness constraints on domain data; identifiers are UUIDs; counts and search only see what the viewer may see. Group access checks also apply to linked records and files. Revision counters are shared across viewers; a single-value field pointing to an invisible record is shown as set and cannot be edited by the guest.
 - **Missing is not invented.** No placeholder records for unknown people; an unknown part of a date stays unknown.
 - **Packs carry data, code carries mechanisms.** No pack ids or field keys are hard-coded for domain behaviour.
 - **Schema changes are forward migrations with data transfer.** Existing migrations are never edited.

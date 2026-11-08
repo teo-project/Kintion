@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { family } from './__tests__/family'
-import { upLines } from './highlight'
+import { jointLines, litSiblings, upLines } from './highlight'
 import { layoutTree } from './layout'
 
 describe('подсветка линий вверх (F-127)', () => {
@@ -31,5 +31,17 @@ describe('подсветка линий вверх (F-127)', () => {
 
   it('неизвестная линия — пусто', () => {
     expect(upLines(l, 'nope').size).toBe(0)
+  })
+
+  it('«Брат / сестра»: линия или плашка — все линии к участникам и сама плашка', () => {
+    const g = layoutTree(family(), { depth: 10 })
+    expect(g.nodes.some(n => n.type === 'siblings' && n.id === 'sib-top')).toBe(true)
+    const lines = g.edges.filter(e => e.source === 'sib-top').map(e => e.id).sort()
+    expect(lines.length).toBeGreaterThan(1)
+    expect([...upLines(g, lines[0]!)].sort()).toEqual(lines)
+    expect([...jointLines(g, 'sib-top')].sort()).toEqual(lines)
+    expect(litSiblings(g, lines[1]!, null)).toBe('sib-top')
+    expect(litSiblings(g, null, 'sib-top')).toBe('sib-top')
+    expect(litSiblings(g, null, null)).toBeNull()
   })
 })

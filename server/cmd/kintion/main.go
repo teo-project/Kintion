@@ -196,7 +196,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		Log: log, Auth: authSvc, PublicURL: cfg.PublicURL,
 		Pool: pool, Registry: reg, Lang: cfg.Language,
 		Files:    &files.Store{Root: cfg.StoragePath, MaxBytes: cfg.UploadMaxBytes()},
-		Licenses: web.Licenses(),
+		Licenses: web.Licenses(), Registration: cfg.Registration,
 	})
 
 	srv := &http.Server{

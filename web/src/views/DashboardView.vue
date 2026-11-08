@@ -10,6 +10,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { GroupDTO, RecordDTO, RelatedDTO } from '@/api/types'
 import GroupPicker from '@/components/GroupPicker.vue'
+import InvitationsBanner from '@/components/InvitationsBanner.vue'
 import KinIcon from '@/components/KinIcon.vue'
 import CreateRelationDialog from '@/components/participants/CreateRelationDialog.vue'
 import RecordList from '@/components/RecordList.vue'
@@ -29,11 +30,18 @@ const PAGE = 50
 const route = useRoute()
 const router = useRouter()
 const dashboards = useDashboardsStore()
+// гость чужого дашборда (F-03): создаёт, только если есть право правки (F-148)
+const guest = computed(() => dashboards.isGuest(props.d))
+const canCreate = computed(() => dashboards.canCreate(props.d))
 
 const reg = shallowRef<Registry | null>(null)
 // реестр правят и другие экраны (настройки дашборда: быстрая форма) — видно сразу
 watch(() => dashboards.current(props.d), r => {
-  if (r && reg.value && r !== reg.value) reg.value = r
+  if (!r || !reg.value || r === reg.value) return
+  const replaced = r.dataRev !== reg.value.dataRev
+  reg.value = r
+  // замена эры изменила даты дашборда (F-143) — список перечитывается
+  if (replaced && view.value === 'list') void fetchList()
 })
 const groups = ref<GroupDTO[]>([])
 const items = shallowRef<RecordDTO[]>([])
@@ -207,6 +215,7 @@ function onGroup(e: Event) {
     <TreeView
       :d="d"
       :reg="reg"
+      :readonly="!canCreate"
       :group="group"
       :focus="focus"
       @groups="reloadGroups"
@@ -259,7 +268,7 @@ function onGroup(e: Event) {
       </h1>
       <span class="kin-spacer" />
       <button
-        v-if="reg"
+        v-if="reg && canCreate"
         class="kin-ibtn kin-ibtn--primary create"
         type="button"
         :disabled="templates.length === 0"
@@ -276,6 +285,13 @@ function onGroup(e: Event) {
       role="alert"
     >
       {{ error }}
+    </p>
+    <InvitationsBanner />
+    <p
+      v-if="guest"
+      class="kin-notice"
+    >
+      {{ canCreate ? t.sharing.guestEditNotice : t.sharing.guestNotice }}
     </p>
     <template v-if="reg">
       <div class="toolbar kin-island">
@@ -342,6 +358,7 @@ function onGroup(e: Event) {
         <TreeSelection
           v-if="selected.size"
           class="list-selection"
+          :readonly="guest"
           :d="d"
           :ids="selectedIds"
           @clear="selected = new Set()"

@@ -29,7 +29,8 @@ func (a *API) fileRoutes() {
 	a.mux.HandleFunc("GET /api/files/{d}/{sha}/preview", a.getPreview)
 }
 
-// FileDTO — загруженный файл; значение поля image хранит SHA256.
+// FileDTO — загруженный файл; значение поля image и file хранит SHA256.
+// Width и Height — только у изображения с превью.
 type FileDTO struct {
 	SHA256    string    `json:"sha256"`
 	MIME      string    `json:"mime"`
@@ -61,24 +62,19 @@ func (a *API) fileError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-// dashboardOf — дашборд из пути {d}, если он доступен (authz).
-func (a *API) dashboardOf(r *http.Request) (sqlc.Dashboard, error) {
-	sess, _ := SessionFrom(r.Context())
-	id, err := pathID(r, "d")
-	if err != nil {
-		return sqlc.Dashboard{}, err
-	}
-	return authz.Dashboard(r.Context(), sqlc.New(a.d.Pool), sess.Account.ID, id)
-}
-
 // uploadFile — POST /api/dashboards/{d}/files, multipart с частью «file».
-// Тот же файл повторно — та же строка (200), новый — 201.
+// Тот же файл повторно — та же строка (200), новый — 201. ?any=1 — любой файл
+// (поле file, KIN-27), иначе только изображения.
 func (a *API) uploadFile(w http.ResponseWriter, r *http.Request) {
-	d, err := a.dashboardOf(r)
+	acc, err := a.viewOf(r, sqlc.New(a.d.Pool))
+	if err == nil && !acc.CanUpload() { // гость без права правки файлы не загружает (F-148)
+		err = authz.ErrNotFound
+	}
 	if err != nil {
 		a.fileError(w, r, err)
 		return
 	}
+	d := acc.Dashboard
 	r.Body = http.MaxBytesReader(w, r.Body, a.d.Files.MaxBytes+multipartSlack)
 	mr, err := r.MultipartReader()
 	if err != nil {
@@ -101,7 +97,7 @@ func (a *API) uploadFile(w http.ResponseWriter, r *http.Request) {
 			_ = part.Close()
 			continue
 		}
-		info, err = a.d.Files.Put(part)
+		info, err = a.d.Files.Put(part, r.URL.Query().Get("any") == "1")
 		_ = part.Close()
 		if err != nil {
 			a.fileError(w, r, err)
@@ -121,17 +117,24 @@ func (a *API) uploadFile(w http.ResponseWriter, r *http.Request) {
 	var row sqlc.File
 	err = pgx.BeginFunc(ctx, a.d.Pool, func(tx pgx.Tx) error {
 		q := sqlc.New(tx)
-		width, height := int32(info.Width), int32(info.Height) //nolint:gosec // ограничено MaxPixels
+		var width, height *int32
+		if info.Width > 0 && info.Height > 0 {
+			w, h := int32(info.Width), int32(info.Height) //nolint:gosec // ограничено MaxPixels
+			width, height = &w, &h
+		}
 		row, err = q.InsertFile(ctx, sqlc.InsertFileParams{
 			ID: uuid.Must(uuid.NewV7()), DashboardID: d.ID, Sha256: info.SHA256, Mime: info.MIME,
-			Size: info.Size, Width: &width, Height: &height, UploadedBy: &sess.Account.ID,
+			Size: info.Size, Width: width, Height: height, UploadedBy: &sess.Account.ID,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			status = http.StatusOK
 			row, err = q.GetFile(ctx, sqlc.GetFileParams{DashboardID: d.ID, Sha256: info.SHA256})
-			return err
-		}
-		if err != nil {
+			if err != nil || !acc.Guest() {
+				return err
+			}
+			// гость загрузил файл, который уже есть: в журнал — его загрузка;
+			// по ней он может прикрепить файл (records.fileMeta)
+		} else if err != nil {
 			return err
 		}
 		return operation(r, sess.Account.ID).Write(ctx, q, audit.Entry{
@@ -142,12 +145,19 @@ func (a *API) uploadFile(w http.ResponseWriter, r *http.Request) {
 		a.fileError(w, r, err)
 		return
 	}
+	// гостю повторная загрузка неотличима от новой: тот же файл мог быть
+	// загружен владельцем и скрыт от гостя (F-07)
+	if acc.Guest() && status == http.StatusOK {
+		status, row.CreatedAt = http.StatusCreated, time.Now().UTC().Truncate(time.Microsecond) // как из БД
+	}
 	httpx.WriteJSON(w, status, fileDTO(row))
 }
 
 // fileOf — строка файла дашборда из пути; чужое и несуществующее — 404.
+// Гостю — только файл из значения поля видимой ему записи (F-05, F-30).
 func (a *API) fileOf(r *http.Request) (sqlc.File, error) {
-	d, err := a.dashboardOf(r)
+	q := sqlc.New(a.d.Pool)
+	acc, err := a.viewOf(r, q)
 	if err != nil {
 		return sqlc.File{}, err
 	}
@@ -155,10 +165,25 @@ func (a *API) fileOf(r *http.Request) (sqlc.File, error) {
 	if !files.ValidSHA(sha) {
 		return sqlc.File{}, authz.ErrNotFound
 	}
-	return sqlc.New(a.d.Pool).GetFile(r.Context(), sqlc.GetFileParams{DashboardID: d.ID, Sha256: sha})
+	if acc.Guest() {
+		t, err := a.rec.ReadAs(r.Context(), q, acc)
+		if err != nil {
+			return sqlc.File{}, err
+		}
+		ok, err := t.FileVisible(sha)
+		if err != nil {
+			return sqlc.File{}, err
+		}
+		if !ok {
+			return sqlc.File{}, authz.ErrNotFound
+		}
+	}
+	return q.GetFile(r.Context(), sqlc.GetFileParams{DashboardID: acc.Dashboard.ID, Sha256: sha})
 }
 
 // serveFile отдаёт неизменный файл: ETag, долгий кеш, 304 на If-None-Match.
+// Изображения и PDF — в браузере (PDF — без sandbox: в нём встроенный
+// просмотрщик не открывается); прочее — только скачиванием.
 func serveFile(w http.ResponseWriter, r *http.Request, path, mime, etag string) error {
 	f, err := os.Open(path) //nolint:gosec // путь собран из проверенного хеша
 	if err != nil {
@@ -170,7 +195,15 @@ func serveFile(w http.ResponseWriter, r *http.Request, path, mime, etag string) 
 	h.Set("Cache-Control", cacheFile)
 	h.Set("Content-Type", mime)
 	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	switch {
+	case files.Mimes[mime]:
+		h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	case mime == "application/pdf":
+		h.Set("Content-Security-Policy", "default-src 'none'")
+	default:
+		h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+		h.Set("Content-Disposition", "attachment")
+	}
 	http.ServeContent(w, r, "", time.Time{}, f) // сам отвечает 304 по If-None-Match
 	return nil
 }

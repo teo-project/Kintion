@@ -51,11 +51,16 @@ func TestUniqueConstraintsAllowList(t *testing.T) {
 		"dashboard_template(id)", "entity(id)", "grp(id)", "participation(id)", "field_entry(id)",
 		"entry_link(id)", "file(id)", "audit_log(id)", "schema_info(singleton)", "goose_db_version(id)",
 		"entity_group(entity_id,group_id)", "field_rev(entity_id,field_key)", "grp_link(parent_id,child_id)",
+		"dashboard_member(dashboard_id,account_id)", "grp_grant(group_id,account_id)", "instance_invite(id)",
 		// (dashboard_id, id) — цели составных FK (F-01)
 		"dashboard_template(dashboard_id,id)", "entity(dashboard_id,id)", "grp(dashboard_id,id)",
 		"field_entry(dashboard_id,id)",
 		// технические
-		"account(login)", "session(token_hash)", "file(dashboard_id,sha256)",
+		"account(login)", "session(token_hash)", "file(dashboard_id,sha256)", "instance_invite(token_hash)",
+		// одна техническая группа гостя в дашборде (F-149): по аккаунту, не по данным
+		"grp(dashboard_id,created_for)",
+		// account_nick_idx — lower(nick), адрес приглашений (F-03); индекс по
+		// выражению этот запрос не показывает
 	}
 	for _, g := range got {
 		if !slices.Contains(allowed, g) {
@@ -244,7 +249,7 @@ func TestPurgeReferenceBehavior(t *testing.T) {
 	must(t, exec(t, p, "INSERT INTO field_entry (id, dashboard_id, entity_id, field_key, sort_key) VALUES ($1, $2, $3, 'x', 'a')", ev, d, b))
 	must(t, exec(t, p, "INSERT INTO entry_link (id, dashboard_id, entry_id, target_id, anchor) VALUES ($1, $2, $3, $4, 'end')", newID(), d, ev, a))
 	// b начинается событием a
-	must(t, exec(t, p, "UPDATE entity SET start_link = $1, end_link = $1, start_date = '(2021,,)' WHERE id = $2", a, b))
+	must(t, exec(t, p, "UPDATE entity SET start_link = $1, end_link = $1, start_date = '(2021,,,)' WHERE id = $2", a, b))
 	must(t, exec(t, p, "INSERT INTO entity_group (dashboard_id, entity_id, group_id) VALUES ($1, $2, $3)", d, a, f.grp[0]))
 	must(t, exec(t, p, "INSERT INTO field_rev (entity_id, field_key, rev) VALUES ($1, 'k', 3)", a))
 	must(t, exec(t, p, `INSERT INTO audit_log (id, dashboard_id, operation_id, source, app_version, schema_version, entity_id, object, object_id, op)
@@ -310,7 +315,7 @@ func TestFieldEntryPartialDate(t *testing.T) {
 	q := sqlc.New(f.pool)
 	ctx := context.Background()
 	d := partialdate.Date{M: 2, D: 29}
-	from := partialdate.Date{Y: 1985}
+	from := partialdate.Date{Y: -1985, M: 2, D: 29, E: "AC"}
 	row, err := q.InsertFieldEntry(ctx, sqlc.InsertFieldEntryParams{
 		ID: newID(), DashboardID: f.dash[0], EntityID: f.a[0], FieldKey: "k", SortKey: "b",
 		VDate: &d, ValidFrom: &from, Meta: []byte(`{}`),
@@ -326,10 +331,95 @@ func TestFieldEntryPartialDate(t *testing.T) {
 		t.Fatalf("list %v %v", list, err)
 	}
 	// пустая и недопустимая даты отклоняются колонкой
-	for _, lit := range []string{"(,,)", "(2023,2,29)", "(,4,31)"} {
+	for _, lit := range []string{"(,,,)", "(2023,2,29,)", "(,4,31,)", "(0,,,)", "(,3,,AC)", "(300,,,\"\")", "(300,,,\" AC\")"} {
 		if err := exec(t, f.pool, `INSERT INTO field_entry (id, dashboard_id, entity_id, field_key, sort_key, v_date)
 			VALUES ($1, $2, $3, 'k', 'c', $4::partial_date)`, newID(), f.dash[0], f.a[0], lit); err == nil {
 			t.Errorf("v_date %s accepted", lit)
+		}
+	}
+}
+
+// Эра по умолчанию дашборда (F-143): триггер ставит её новым датам с годом и
+// пустой эрой во всех колонках-датах — при вставке и когда колонка была NULL;
+// существующие даты, другой дашборд, даты без года и даты с эрой не трогает.
+func TestDefaultEraTrigger(t *testing.T) {
+	f := newFixture(t)
+	p := f.pool
+	must(t, exec(t, p, `UPDATE dashboard SET eras = '{"default":"AC"}' WHERE id = $1`, f.dash[0]))
+	era := func(sql string, args ...any) *string {
+		t.Helper()
+		var e *string
+		if err := p.QueryRow(context.Background(), sql, args...).Scan(&e); err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
+	must(t, exec(t, p, `UPDATE entity SET start_date = '(1990,,,)', end_date = '(,3,,)' WHERE id = $1`, f.a[0]))
+	if e := era(`SELECT (start_date).e FROM entity WHERE id = $1`, f.a[0]); e == nil || *e != "AC" {
+		t.Fatalf("entity start %v", e)
+	}
+	if e := era(`SELECT (end_date).e FROM entity WHERE id = $1`, f.a[0]); e != nil {
+		t.Fatalf("entity end without year %v", *e)
+	}
+	must(t, exec(t, p, `UPDATE entity SET start_date = '(1990,,,)' WHERE id = $1`, f.a[1]))
+	if e := era(`SELECT (start_date).e FROM entity WHERE id = $1`, f.a[1]); e != nil {
+		t.Fatalf("other dashboard %v", *e)
+	}
+	pid := newID()
+	must(t, exec(t, p, `INSERT INTO participation (id, dashboard_id, container_id, entity_id, role, sort_key, valid_from, valid_to)
+		VALUES ($1, $2, $3, $4, 'r', 'a', '(5,,,)', '(7,,,"BC")')`, pid, f.dash[0], f.a[0], f.b[0]))
+	if e := era(`SELECT (valid_from).e FROM participation WHERE id = $1`, pid); e == nil || *e != "AC" {
+		t.Fatalf("participation from %v", e)
+	}
+	if e := era(`SELECT (valid_to).e FROM participation WHERE id = $1`, pid); e == nil || *e != "BC" {
+		t.Fatalf("participation to %v", e)
+	}
+	must(t, exec(t, p, `UPDATE field_entry SET v_date = '(,,,"Мезозой")', valid_from = '(1,2,3,)', valid_to = '(2,,,)' WHERE id = $1`, f.fe[0]))
+	var v, from, to string
+	if err := p.QueryRow(context.Background(), `SELECT v_date::text, valid_from::text, valid_to::text FROM field_entry WHERE id = $1`, f.fe[0]).
+		Scan(&v, &from, &to); err != nil {
+		t.Fatal(err)
+	}
+	if v != "(,,,Мезозой)" || from != "(1,2,3,AC)" || to != "(2,,,AC)" {
+		t.Fatalf("field_entry %s %s %s", v, from, to)
+	}
+	// существующая дата при правке без эры остаётся без эры
+	must(t, exec(t, p, `UPDATE entity SET start_date = '(1991,,,)' WHERE id = $1`, f.a[0]))
+	if e := era(`SELECT (start_date).e FROM entity WHERE id = $1`, f.a[0]); e != nil {
+		t.Fatalf("existing start %v", *e)
+	}
+	// у даты без года появился год — дата уже была: эра не ставится
+	must(t, exec(t, p, `UPDATE entity SET end_date = '(5,3,,)' WHERE id = $1`, f.a[0]))
+	if e := era(`SELECT (end_date).e FROM entity WHERE id = $1`, f.a[0]); e != nil {
+		t.Fatalf("existing end %v", *e)
+	}
+}
+
+// Замена эры в дате (F-143, миграция 0012): с годом — новая эра; из одной эры
+// при замене на пустую — дата очищается.
+func TestEraReplaceFunctions(t *testing.T) {
+	f := newFixture(t)
+	str := func(sql string) *string {
+		t.Helper()
+		var s *string
+		if err := f.pool.QueryRow(context.Background(), sql).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	for sql, want := range map[string]string{
+		`SELECT pd_era_matches('(5,,,AC)'::partial_date, 'AC')::text`:               "true",
+		`SELECT pd_era_matches('(,,,AC)'::partial_date, 'AC')::text`:                "true",
+		`SELECT pd_era_matches('(5,,,)'::partial_date, NULL)::text`:                 "true",
+		`SELECT pd_era_matches('(,3,,)'::partial_date, NULL)::text`:                 "false",
+		`SELECT pd_era_matches('(5,,,BC)'::partial_date, 'AC')::text`:               "false",
+		`SELECT pd_with_era('(5,3,,AC)'::partial_date, 'BC')::text`:                 "(5,3,,BC)",
+		`SELECT pd_with_era('(5,,,AC)'::partial_date, NULL)::text`:                  "(5,,,)",
+		`SELECT pd_with_era('(,,,AC)'::partial_date, 'Mz')::text`:                   "(,,,Mz)",
+		`SELECT coalesce(pd_with_era('(,,,AC)'::partial_date, NULL)::text, 'NULL')`: "NULL",
+	} {
+		if got := str(sql); got == nil || *got != want {
+			t.Errorf("%s = %v, want %s", sql, got, want)
 		}
 	}
 }

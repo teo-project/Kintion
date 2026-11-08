@@ -23,15 +23,15 @@ curl localhost:8080/healthz     # {"status":"ok","db":"ok"}
 
 ## First start: the owner
 
-There is no registration. The first account is created with a one-time **setup token** that the application writes to its log while no owner exists:
+Before initial setup, registration is closed. The first account is created with a one-time **setup token** that the application writes to its log while no owner exists:
 
 ```sh
 docker compose logs app | grep bootstrap_token
 ```
 
-Open the interface, enter the token, a login and a password. A first dashboard is created and the token stops working. The owner is the only account and the administrator.
+Open the interface, enter the token, a login and a password. A first dashboard is created and the token stops working. This first account is the instance administrator. Other accounts can register by invitation (the default), through open registration, or be created by the admin in closed mode; see `TEO_KIN_REGISTRATION` below. Each new account gets its own dashboard. Joining a shared dashboard requires a separate invitation from its owner: see [Sharing](sharing.md).
 
-Forgotten password (there is no e-mail yet) — a command in the container sets a new random password and ends all sessions of the owner:
+Forgotten password (there is no e-mail yet) — a command in the container sets a new random password and ends all sessions of that account:
 
 ```sh
 docker compose exec app /usr/local/bin/kintion reset-password --login <login>
@@ -61,7 +61,7 @@ If a reverse proxy runs in the same Docker network you can omit `ports` and let 
 
 ## Dockge / Portainer (without cloning)
 
-No repository clone is needed: Docker builds the image straight from a tagged git revision (`context: "https://github.com/teo-project/Kintion.git#v0.1.0"`, `dockerfile: deploy/Dockerfile`). Paste the file below as a new stack in Dockge (or into the Portainer stack editor, "Web editor").
+No repository clone is needed: Docker builds the image straight from a tagged git revision (`context: "https://github.com/teo-project/Kintion.git#v0.2.0"`, `dockerfile: deploy/Dockerfile`). Paste the file below as a new stack in Dockge (or into the Portainer stack editor, "Web editor").
 
 ```yaml
 # Kintion for Dockge / Portainer: no repository clone needed, the image is
@@ -72,11 +72,11 @@ name: kintion
 services:
   app:
     build:
-      context: "https://github.com/teo-project/Kintion.git#v0.1.0"
+      context: "https://github.com/teo-project/Kintion.git#v0.2.0"
       dockerfile: deploy/Dockerfile
       args:
-        VERSION: ${TEO_KIN_VERSION:-v0.1.0}
-    image: kintion:${TEO_KIN_VERSION:-v0.1.0}
+        VERSION: ${TEO_KIN_VERSION:-v0.2.0}
+    image: kintion:${TEO_KIN_VERSION:-v0.2.0}
     restart: unless-stopped
     environment:
       # external database: set TEO_KIN_DATABASE_URL in .env
@@ -86,7 +86,7 @@ services:
       TEO_KIN_LANGUAGE: ${TEO_KIN_LANGUAGE:-en}
       TEO_KIN_PACKS: ${TEO_KIN_PACKS:-kin.core}
       TEO_KIN_AUTH_MODE: ${TEO_KIN_AUTH_MODE:-local}
-      TEO_KIN_REGISTRATION: ${TEO_KIN_REGISTRATION:-closed}
+      TEO_KIN_REGISTRATION: ${TEO_KIN_REGISTRATION:-invite}
       TEO_KIN_UPLOAD_MAX_MB: ${TEO_KIN_UPLOAD_MAX_MB:-20}
       # in Compose this is a port only: it is used on both sides of "ports"
       TEO_KIN_HTTP_BIND: ${TEO_KIN_HTTP_BIND:-8080}
@@ -202,9 +202,19 @@ volumes:
 
 - **Variables.** In Dockge put them in the stack's `.env` / Environment box, in Portainer in "Environment variables". Set at least `TEO_KIN_DB_PASSWORD`; useful ones: `TEO_KIN_HTTP_BIND` (port, default `8080`), `TEO_KIN_PUBLIC_URL`, `TEO_KIN_LANGUAGE` (`en` or `ru`), `TEO_KIN_PACKS`. The full list is in [Configuration](#configuration).
 - **First start.** Deploy with a build (the first build takes a few minutes). The setup token is in the `app` log: Dockge — the console/logs of the stack, Portainer — container `app` → Logs; or `docker compose logs app | grep bootstrap_token`. Open `http://<host>:<port>`, enter the token and choose the owner login and password.
-- **Update.** The revision is pinned by the tag. To update, change the tag in `context` (`#v0.1.0` → the new one) **and** set `TEO_KIN_VERSION` to the same value: the image tag changes, so the redeploy builds the new image (a plain "re-pull" does nothing here, the image is built locally, not pulled from a registry). If the tag is unchanged, rebuild from the stack terminal: `docker compose build --no-cache app && docker compose up -d`. Read the release notes first: [Migrations and upgrades](#migrations-and-upgrades).
+- **Update.** The revision is pinned by the tag. To update, change the tag in `context` (`#v0.2.0` → the new one) **and** set `TEO_KIN_VERSION` to the same value: the image tag changes, so the redeploy builds the new image (a plain "re-pull" does nothing here, the image is built locally, not pulled from a registry). If the tag is unchanged, rebuild from the stack terminal: `docker compose build --no-cache app && docker compose up -d`. Read the release notes first: [Migrations and upgrades](#migrations-and-upgrades).
 - **Backup.** `backup` and `restore` are in the `tools` profile and never start with the stack (do not enable the profile for the whole stack: that would start `restore` too). Run the backup from the stack terminal (Dockge: "Terminal"; elsewhere any shell in the stack directory): `docker compose run --rm backup` — naming the service enables its profile. Portainer has no per-stack terminal for this: on the Docker host run `docker compose -p <stack name> -f <the stack's compose file> run --rm backup` (Portainer keeps stack files in its data volume, under `compose/<stack id>/`; or save the file above on the host and use the same project name). Pass the same variables to that command (`TEO_KIN_DB_PASSWORD=... docker compose ...` or `--env-file`): values set only in the Portainer UI are not visible to the shell, and a wrong password makes the backup fail. The same goes for `restore`. Unlike the repository's compose file, backups go to the named volume `kintion-backups` (Compose prefixes its name with the stack name; see `docker volume ls`) instead of the `./backups` folder, which Portainer stacks do not have. To copy them out (take the real volume name, ending in `_kintion-backups`, from `docker volume ls`): `docker run --rm -v <volume>:/b -v "$PWD":/o alpine cp -r /b /o/backups`. Restore works as in [Backup and restore](#backup-and-restore), with `/backups` being that volume, not a host folder (stop `app`, then `docker compose run --rm restore`). The cron example there is for the repository setup.
 - **Scope.** Docker Standalone only: `docker stack deploy` (Swarm) ignores `build`.
+
+### Ready-made image instead of a build
+
+Starting with the first release published after the image workflow was added, every release tag also has a ready-made image for `linux/amd64` and `linux/arm64`: `ghcr.io/teo-project/kintion:<tag>` (and `latest` for the newest release). With it the stack needs no build and no access to the Go and npm registries from your server. In the file above replace the `build:` block and the `image:` line of `app` with one line:
+
+```yaml
+    image: ghcr.io/teo-project/kintion:${TEO_KIN_VERSION:-latest}
+```
+
+Update: set `TEO_KIN_VERSION` to the new tag (or keep `latest`) and redeploy with "re-pull" (`docker compose pull && docker compose up -d`).
 
 ## Configuration
 
@@ -222,7 +232,7 @@ All variables start with `TEO_KIN_`. Priority: defaults → YAML file from `TEO_
 | `TEO_KIN_PACKS` | `kin.core` | enabled bundled packs, comma-separated |
 | `TEO_KIN_PACKS_PATH` | — | read packs from disk instead of the embedded ones (pack development) |
 | `TEO_KIN_AUTH_MODE` | `local` | sign-in; only `local` is supported |
-| `TEO_KIN_REGISTRATION` | `closed` | only `closed` (single owner) is supported |
+| `TEO_KIN_REGISTRATION` | `invite` | `invite` — accounts by an invitation link from the admin (Account → Accounts); `invite-all` — any user can create invitation links; `open` — anyone can register on the sign-in page; `closed` — only the admin creates accounts (Account → Accounts) |
 | `TEO_KIN_UPLOAD_MAX_MB` | `20` | upload size limit |
 | `TEO_KIN_CONFIG` | — | path to a YAML settings file |
 
@@ -233,6 +243,8 @@ Compose-only variables (not passed to the application): `TEO_KIN_DB_PASSWORD`, `
 Set `TEO_KIN_DATABASE_URL=postgres://user:password@host:5432/kintion?sslmode=require`. The bundled `db` still starts but is unused. The `backup` and `restore` services refuse to run with an external database — use your own tools.
 
 ## Migrations and upgrades
+
+For an upgrade from public 0.1 to 0.2, back up the database **and** files first. The new image applies the added era and sharing migrations automatically; existing dashboards stay with their owners and are not shared automatically. Registration defaults to `invite`. Review [release notes](../RELEASE_NOTES.md) before upgrading. The `v0.2.0` tag and matching registry image become available only when the release is published; a preview branch does not publish them.
 
 The schema is upgraded automatically at start (migrations are embedded in the binary). If the database schema is newer than the application, the application refuses to start. Manually:
 

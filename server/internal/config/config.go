@@ -40,7 +40,8 @@ type Config struct {
 	PacksPath string `yaml:"packs_path"`
 	// AuthMode — режим входа (F-27); в 0.1 только local (Д-6).
 	AuthMode string `yaml:"auth_mode"`
-	// Registration — регистрация аккаунтов (F-28); в 0.1 только closed (Д-6).
+	// Registration — регистрация аккаунтов (F-28): open, invite (по приглашению
+	// админа), invite-all (по приглашению любого пользователя), closed.
 	Registration string `yaml:"registration"`
 	// UploadMaxMB — предел размера загружаемого файла в мегабайтах.
 	UploadMaxMB string `yaml:"upload_max_mb"`
@@ -56,8 +57,8 @@ func Defaults() Config {
 		Packs:       packstorage.DefaultPacks,
 		// F-28 по умолчанию invite, но в 0.1 есть только владелец (Д-6)
 		AuthMode:     "local",
-		Registration: "closed",
-		UploadMaxMB:  "20",
+		Registration: "invite",
+		UploadMaxMB:  "50",
 	}
 }
 
@@ -167,11 +168,9 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%sAUTH_MODE: неизвестный режим %q (local, both, oidc)", EnvPrefix, c.AuthMode)
 	}
 	switch c.Registration {
-	case "closed":
-	case "open", "invite":
-		return fmt.Errorf("%sREGISTRATION=%s не поддерживается в 0.1: аккаунт один — владелец (closed)", EnvPrefix, c.Registration)
+	case "open", "invite", "invite-all", "closed":
 	default:
-		return fmt.Errorf("%sREGISTRATION: неизвестное значение %q (open, invite, closed)", EnvPrefix, c.Registration)
+		return fmt.Errorf("%sREGISTRATION: неизвестное значение %q (open, invite, invite-all, closed)", EnvPrefix, c.Registration)
 	}
 	if len(c.PackList()) == 0 {
 		return errors.New(EnvPrefix + "PACKS: нужен хотя бы один пак")

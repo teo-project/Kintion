@@ -9,6 +9,9 @@ RETURNING *;
 -- name: GetAccount :one
 SELECT * FROM account WHERE id = $1;
 
+-- name: LockAccount :one
+SELECT * FROM account WHERE id = $1 FOR UPDATE;
+
 -- name: GetAccountByLogin :one
 SELECT * FROM account WHERE login = $1;
 

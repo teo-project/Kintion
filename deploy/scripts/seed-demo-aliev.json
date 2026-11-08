@@ -1,0 +1,344 @@
+{
+ "records": [
+  {
+   "ref": "murat",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Мурат"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1885
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1950
+    }
+   }
+  },
+  {
+   "ref": "fatima",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Фатима"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1890
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1960
+    }
+   }
+  },
+  {
+   "ref": "zarina",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Зарина"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1895
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1970
+    }
+   }
+  },
+  {
+   "ref": "leila",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Лейла"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1900
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1975
+    }
+   }
+  },
+  {
+   "ref": "ruslan",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Руслан"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1912
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1985
+    }
+   }
+  },
+  {
+   "ref": "amina",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Амина"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиева"
+     }
+    ],
+    "gender": [
+     {
+      "value": "female"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1918
+    }
+   },
+   "end": {
+    "value": {
+     "y": 1995
+    }
+   }
+  },
+  {
+   "ref": "timur",
+   "entity": "kin.core.person",
+   "fields": {
+    "name": [
+     {
+      "value": "Тимур"
+     }
+    ],
+    "surname": [
+     {
+      "value": "Алиев"
+     }
+    ],
+    "gender": [
+     {
+      "value": "male"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1924
+    }
+   },
+   "end": {
+    "value": {
+     "y": 2001
+    }
+   }
+  },
+  {
+   "ref": "u-murat",
+   "template": "kin.core.relationship",
+   "fields": {
+    "stage": [
+     {
+      "value": "marriage"
+     }
+    ]
+   },
+   "start": {
+    "value": {
+     "y": 1910
+    }
+   },
+   "note": "Многожёнство: пара из четырёх участников"
+  },
+  {
+   "ref": "pc-al-ruslan-murat",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc-al-ruslan-fatima",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc-al-amina-murat",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc-al-amina-zarina",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc-al-timur-murat",
+   "template": "kin.core.parent_child"
+  },
+  {
+   "ref": "pc-al-timur-leila",
+   "template": "kin.core.parent_child"
+  }
+ ],
+ "participants": [
+  {
+   "container": "u-murat",
+   "entity": "murat",
+   "role": "partner"
+  },
+  {
+   "container": "u-murat",
+   "entity": "fatima",
+   "role": "partner"
+  },
+  {
+   "container": "u-murat",
+   "entity": "zarina",
+   "role": "partner"
+  },
+  {
+   "container": "u-murat",
+   "entity": "leila",
+   "role": "partner"
+  },
+  {
+   "container": "pc-al-ruslan-murat",
+   "entity": "murat",
+   "role": "parent"
+  },
+  {
+   "container": "pc-al-ruslan-murat",
+   "entity": "ruslan",
+   "role": "child"
+  },
+  {
+   "container": "pc-al-ruslan-fatima",
+   "entity": "fatima",
+   "role": "parent"
+  },
+  {
+   "container": "pc-al-ruslan-fatima",
+   "entity": "ruslan",
+   "role": "child"
+  },
+  {
+   "container": "pc-al-amina-murat",
+   "entity": "murat",
+   "role": "parent"
+  },
+  {
+   "container": "pc-al-amina-murat",
+   "entity": "amina",
+   "role": "child"
+  },
+  {
+   "container": "pc-al-amina-zarina",
+   "entity": "zarina",
+   "role": "parent"
+  },
+  {
+   "container": "pc-al-amina-zarina",
+   "entity": "amina",
+   "role": "child"
+  },
+  {
+   "container": "pc-al-timur-murat",
+   "entity": "murat",
+   "role": "parent"
+  },
+  {
+   "container": "pc-al-timur-murat",
+   "entity": "timur",
+   "role": "child"
+  },
+  {
+   "container": "pc-al-timur-leila",
+   "entity": "leila",
+   "role": "parent"
+  },
+  {
+   "container": "pc-al-timur-leila",
+   "entity": "timur",
+   "role": "child"
+  }
+ ]
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"kintion/server/internal/audit"
+	"kintion/server/internal/authz"
 	"kintion/server/internal/db/sqlc"
 	"kintion/server/internal/httpx"
 	"kintion/server/internal/records"
@@ -110,8 +111,8 @@ func optUUID(w http.ResponseWriter, qs map[string][]string, name string) (*uuid.
 // listAudit — GET /api/dashboards/{d}/audit?entity=&operation=&actor=&op=&before=&limit=
 // Журнал дашборда сгруппирован по операциям; entity — история записи: её
 // изменения и её участия в других записях; actor — автор (uuid или system —
-// изменения системы); op — действие (create, update, …). В 0.1 читает
-// владелец (F-08).
+// изменения системы); op — действие (create, update, …). Владелец видит весь
+// журнал, гость — только свои действия (F-08).
 func (a *API) listAudit(w http.ResponseWriter, r *http.Request) {
 	qs := r.URL.Query()
 	entity, ok := optUUID(w, qs, "entity")
@@ -157,16 +158,30 @@ func (a *API) listAudit(w http.ResponseWriter, r *http.Request) {
 		beforeAt, beforeOp = &at, op
 	}
 
-	d, err := a.dashboardOf(r)
+	ctx := r.Context()
+	q := sqlc.New(a.d.Pool)
+	acc, err := a.viewOf(r, q)
 	if err != nil {
 		a.recordError(w, r, err)
 		return
 	}
-	ctx := r.Context()
-	q := sqlc.New(a.d.Pool)
+	d := acc.Dashboard
+	if acc.Guest() {
+		// гость — только свои действия: чужой автор и «система» — пустая страница
+		if systemOnly || (actor != nil && *actor != acc.Account) {
+			httpx.WriteJSON(w, http.StatusOK, &AuditOut{Operations: []*AuditOperationDTO{}, Records: map[uuid.UUID]*records.RecordDTO{},
+				Related: map[uuid.UUID]*records.RecordDTO{}, Purged: map[uuid.UUID]*records.RecordDTO{}})
+			return
+		}
+		actor = &acc.Account
+	}
+	hidden := []string{}
+	if acc.Guest() {
+		hidden = guestHiddenObjects
+	}
 	ops, err := q.ListAuditOperations(ctx, sqlc.ListAuditOperationsParams{
 		DashboardID: d.ID, Entity: entity, Operation: opFilter, Actor: actor, SystemOnly: systemOnly, Op: opKind,
-		BeforeAt: beforeAt, BeforeOp: beforeOp, Lim: int32(limit + 1), //nolint:gosec // ≤ auditMaxLimit+1
+		HiddenObjects: hidden, BeforeAt: beforeAt, BeforeOp: beforeOp, Lim: int32(limit + 1), //nolint:gosec // ≤ auditMaxLimit+1
 	})
 	if err != nil {
 		a.internal(w, r, err)
@@ -192,13 +207,29 @@ func (a *API) listAudit(w http.ResponseWriter, r *http.Request) {
 		out.Operations = append(out.Operations, dto)
 	}
 	rows, err := q.ListAuditEntries(ctx, sqlc.ListAuditEntriesParams{
-		DashboardID: d.ID, Operations: ids, Entity: entity, Actor: actor, SystemOnly: systemOnly, Op: opKind,
+		DashboardID: d.ID, Operations: ids, Entity: entity, Actor: actor, SystemOnly: systemOnly, Op: opKind, HiddenObjects: hidden,
 	})
 	if err != nil {
 		a.internal(w, r, err)
 		return
 	}
+	var gt *records.Tx // гостю — снимки без привязок к невидимому (F-08)
+	if acc.Guest() {
+		if gt, err = a.rec.ReadAs(ctx, q, acc); err != nil {
+			a.internal(w, r, err)
+			return
+		}
+	}
 	for _, e := range rows {
+		if gt != nil {
+			if !guestSeesAudit(acc, e.Object, e.ObjectID) {
+				continue
+			}
+			var show bool
+			if e.Before, e.After, show = gt.GuestAudit(e.Object, e.Before, e.After); !show {
+				continue
+			}
+		}
 		o := byID[e.OperationID]
 		if len(o.Entries) == 0 {
 			o.ActorID, o.ActorLogin, o.Source, o.RequestID = e.ActorID, e.ActorLogin, e.Source, e.RequestID
@@ -207,11 +238,45 @@ func (a *API) listAudit(w http.ResponseWriter, r *http.Request) {
 		o.Entries = append(o.Entries, AuditEntryDTO{ID: e.ID, At: e.At, EntityID: e.EntityID, Object: e.Object,
 			ObjectID: e.ObjectID, Op: e.Op, Before: rawJSON(e.Before), After: rawJSON(e.After)})
 	}
-	if err := a.auditRecords(r, d.ID, q, out); err != nil {
+	if acc.Guest() { // операции, от которых гостю ничего не осталось, не показываются
+		out.Operations = slices.DeleteFunc(out.Operations, func(o *AuditOperationDTO) bool { return len(o.Entries) == 0 })
+		// курсор — по последней показанной операции; если не осталось ни одной —
+		// по последней обработанной (это собственное действие гостя), чтобы
+		// листание дошло до более старых
+		if out.Next != nil {
+			if n := len(out.Operations); n > 0 {
+				next := auditCursor(out.Operations[n-1].At, out.Operations[n-1].OperationID)
+				out.Next = &next
+			}
+		}
+	}
+	if err := a.auditRecords(r, acc, q, out); err != nil {
 		a.internal(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// guestHiddenObjects — записи журнала, которых гостю не показывают ещё до
+// разбивки на страницы (иначе по пустым страницам видно скрытое, F-07):
+// группы, их вложенность и выдачи прав — дело владельца (F-149); загрузка
+// файла — не правка данных.
+var guestHiddenObjects = []string{"grp", "grp_link", "grp_grant", "file"}
+
+// guestSeesAudit — запись журнала из действий гостя, которую ему можно
+// показать (F-08, F-149), сверх guestHiddenObjects: метки — только видимых
+// гостю групп, не его технической (автогруппы владельца могут поставить
+// метку скрытой группы).
+func guestSeesAudit(acc authz.Access, object string, objectID *uuid.UUID) bool {
+	switch object {
+	case "entity_group":
+		if objectID == nil {
+			return false
+		}
+		_, seen := acc.Groups[*objectID]
+		return seen && !acc.Own[*objectID]
+	}
+	return true
 }
 
 // auditRefs — записи, упомянутые в записи журнала: сама запись истории и
@@ -222,7 +287,7 @@ type auditRefs struct {
 }
 
 // auditRecords добавляет в страницу конверты упомянутых записей и их related.
-func (a *API) auditRecords(r *http.Request, dashboard uuid.UUID, q *sqlc.Queries, out *AuditOut) error {
+func (a *API) auditRecords(r *http.Request, acc authz.Access, q *sqlc.Queries, out *AuditOut) error {
 	seen := map[uuid.UUID]bool{}
 	var ids []uuid.UUID
 	add := func(id *uuid.UUID) {
@@ -246,7 +311,7 @@ func (a *API) auditRecords(r *http.Request, dashboard uuid.UUID, q *sqlc.Queries
 	if len(ids) == 0 {
 		return nil
 	}
-	t, err := a.rec.Read(r.Context(), q, dashboard)
+	t, err := a.rec.ReadAs(r.Context(), q, acc)
 	if err != nil {
 		return err
 	}
@@ -256,7 +321,7 @@ func (a *API) auditRecords(r *http.Request, dashboard uuid.UUID, q *sqlc.Queries
 	}
 	var gone []uuid.UUID
 	for _, id := range ids {
-		if _, ok := recs[id]; !ok {
+		if _, ok := recs[id]; !ok && !acc.Guest() { // гостю невидимое не восстанавливается по журналу
 			gone = append(gone, id)
 		}
 	}

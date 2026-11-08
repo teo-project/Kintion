@@ -230,6 +230,16 @@ describe('прошлая связь (F-98)', () => {
     expect(pastOf(specs, '2026-11-01')).toEqual({ y2025: true, m2026: true, d: true, none: false })
   })
 
+  it('год мира (F-143): «сегодня» — год и эра дашборда; даты сравниваются по месту эры, затем по году', () => {
+    const specs = [pair('ac290', { y: 290, e: 'AC' }), pair('ac300', { y: 300, e: 'AC' }), pair('ac310', { y: 310, e: 'AC' }), pair('bc', { y: -5, e: 'BC' })]
+    const world = (c: ReturnType<typeof ctxOf>) => {
+      c.today = { y: 300, e: 'AC' }
+      c.eras = ['BC', 'AC']
+    }
+    // конец в году мира ещё не наступил; эра BC — раньше AC
+    expect(pastOf(specs, '2026-10-12', world)).toEqual({ ac290: true, ac300: false, ac310: false, bc: true })
+  })
+
   it('конец без известной даты (нет года) — связь текущая', () => {
     expect(pastOf([pair('noyear', { m: 5 })], '2026-10-12')).toEqual({ noyear: false })
   })
@@ -269,5 +279,17 @@ describe('порядок «Связей» по весу (F-103)', () => {
     // без веса — после всех с весом
     delete tpl.links_rank
     expect(view().map(r => r.record)).toEqual(['parent', 'oldjob', 'job', 'oldpair', 'pair0', 'pair1', 'pair2', 'b'])
+  })
+})
+
+describe('поле со скрытым от гостя значением (Q-50)', () => {
+  it('занятое одиночное поле — «Задано»: не пустое и не прячется за «Добавить»', () => {
+    const ctx = ctxOf(ruSchema(), people)
+    const anna = ctx.records.anna!
+    anna.fields.nickname = { rev: 1, values: [], hidden: true }
+    const all = cardView(ctx, anna).sections.flatMap(s => [...s.fields, ...s.addable])
+    const f = all.find(x => x.key === 'nickname')!
+    expect(f).toMatchObject({ occupied: true, empty: false, hidden: false, values: [] })
+    expect(all.find(x => x.key === 'name')!.occupied).toBe(false)
   })
 })

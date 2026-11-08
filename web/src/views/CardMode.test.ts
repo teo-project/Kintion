@@ -132,3 +132,43 @@ describe('режим карточек (F-108)', () => {
     expect(document.body.querySelector('.kin-popover.history')).not.toBeNull()
   })
 })
+
+describe('гость чужого дашборда (F-03, F-148)', () => {
+  it('запись без права правки — во всех режимах только чтение: без кнопки правки, ручек, добавления и «В корзину»', async () => {
+    for (const mode of ['read', 'inline', 'form'] as CardMode[]) {
+      serve((m, u) => {
+        if (m === 'GET' && u === '/api/me/prefs') return [200, { history_edit: '', card_mode: mode }]
+        if (m === 'GET' && u === '/api/records/liza') return [200, { record: { ...envelope(liza), editable: false }, related: {} }]
+        if (m === 'GET' && u === '/api/dashboards') return [200, [{ id: 'd1', name: 'Чужой', created_at: '', guest: true, owner_nick: 'papa', can_edit: true }]]
+        return undefined
+      })
+      const w = await mountRecord('liza')
+      await flushPromises()
+      expect(w.find('h1').text()).toContain('Лиза')
+      expect(w.find('.mode').exists()).toBe(false)
+      expect(w.find('.field-row input').exists()).toBe(false)
+      expect(w.find('.handle').exists()).toBe(false)
+      expect(w.find('.add-field').exists()).toBe(false)
+      expect(w.find('.to-trash').exists()).toBe(false)
+      w.unmount()
+    }
+  })
+})
+
+describe('гость с правом правки (F-148)', () => {
+  it('запись с правкой — правится, но без «В корзину»', async () => {
+    serve((m, u) => {
+      if (m === 'GET' && u === '/api/me/prefs') return [200, { history_edit: '', card_mode: 'read' }]
+      if (m === 'GET' && u === '/api/records/liza') return [200, { record: { ...envelope(liza), editable: true }, related: {} }]
+      if (m === 'GET' && u === '/api/dashboards') return [200, [{ id: 'd1', name: 'Чужой', created_at: '', guest: true, owner_nick: 'papa', can_edit: true }]]
+      return undefined
+    })
+    const w = await mountRecord('liza')
+    await flushPromises()
+    expect(w.find('.mode').exists()).toBe(true)
+    await w.find('.mode').trigger('click')
+    await flushPromises()
+    expect(w.findAll('.field-row').find(r => r.find('.label').text() === 'Фамилия')!.find('input').exists()).toBe(true)
+    expect(w.find('.to-trash').exists()).toBe(false)
+  })
+})

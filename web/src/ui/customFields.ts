@@ -5,15 +5,18 @@
 // Типы (F-96): «выбор» — варианты задаются при создании, «изображение» —
 // загрузка с одной свободной обрезкой, ссылка — с ограничением сущностью;
 // «контакта» нет. «Выбор или своё» (F-100) — тип choice с флагом free.
-import type { FieldDef, FieldType, MetaDef } from '@/core/types'
+import type { CustomSectionDef, FieldDef, FieldType, MetaDef } from '@/core/types'
 import { CROP_EDITOR } from './crop'
 
+/** Блок «Свои поля» — поле без section (F-61). */
+const CUSTOM_SECTION = 'custom'
+
 /** Типы, которые можно выбрать для своего поля. */
-export const CUSTOM_TYPES: FieldType[] = ['text', 'number', 'partial_date', 'bool', 'choice', 'ref', 'image', 'phone', 'email', 'url', 'place']
+export const CUSTOM_TYPES: FieldType[] = ['text', 'number', 'partial_date', 'bool', 'choice', 'ref', 'image', 'file', 'phone', 'email', 'url', 'place', 'rich_text']
 
 /** Вид своего поля в форме: тип или «выбор или своё» (choice + free, F-100). */
 export type CustomKind = FieldType | 'choice_free'
-export const CUSTOM_KINDS: CustomKind[] = ['text', 'number', 'partial_date', 'bool', 'choice', 'choice_free', 'ref', 'image', 'phone', 'email', 'url', 'place']
+export const CUSTOM_KINDS: CustomKind[] = ['text', 'number', 'partial_date', 'bool', 'choice', 'choice_free', 'ref', 'image', 'file', 'phone', 'email', 'url', 'place', 'rich_text']
 
 /** Вид описания поля. */
 export function kindOf(def: Pick<FieldDef, 'type' | 'free'>): CustomKind {
@@ -57,6 +60,8 @@ export interface CustomDraft {
   entity?: string
   /** подпись meta обрезки изображения */
   cropName?: string
+  /** блок карточки (F-139): '' — «Свои поля»; нет ключа — прежний */
+  section?: string
 }
 
 /**
@@ -105,6 +110,10 @@ export function customDef(key: string, d: CustomDraft, prev?: FieldDef): FieldDe
   else delete def.entities
   if (d.type === 'image') def.meta = prev?.meta?.length ? prev.meta : [freeCropMeta(d.cropName ?? 'crop')]
   else delete def.meta
+  if (d.section !== undefined) {
+    if (d.section && d.section !== CUSTOM_SECTION) def.section = d.section
+    else delete def.section
+  }
   return def
 }
 
@@ -114,4 +123,21 @@ export function withCustom(list: FieldDef[], key: string, def: FieldDef | null):
   if (def === null) return list.filter(f => f.key !== key)
   if (i < 0) return [...list, def]
   return list.map(f => (f.key === key ? def : f))
+}
+
+/** Ключ нового своего блока (F-139): из названия и случайного хвоста — общий
+ * блок шаблона не совпадёт с блоком записи, которую не видно в этой карточке. */
+export function sectionKey(name: string, taken: string[], rnd: () => number = Math.random): string {
+  const used = new Set(taken)
+  const stem = customKey(name, []).slice(0, 40)
+  for (;;) {
+    const k = `${stem}_${Math.floor(rnd() * 36 ** 4).toString(36).padStart(4, '0')}`
+    if (!used.has(k)) return k
+  }
+}
+
+/** Список блоков после добавления, замены (по ключу) или удаления (def = null). */
+export function withSection(list: CustomSectionDef[], key: string, def: CustomSectionDef | null): CustomSectionDef[] {
+  if (def === null) return list.filter(s => s.key !== key)
+  return list.some(s => s.key === key) ? list.map(s => (s.key === key ? def : s)) : [...list, def]
 }

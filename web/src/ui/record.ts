@@ -9,7 +9,7 @@ import { api, ApiError } from '@/api/client'
 import type { CardMode, RecordOut, RelatedDTO } from '@/api/types'
 import { cardView } from '@/core/card'
 import type { Registry } from '@/core/registry'
-import type { FieldDef, RecordDTO } from '@/core/types'
+import type { CustomSectionDef, FieldDef, RecordDTO } from '@/core/types'
 import { errorText, t } from '@/i18n'
 import { useDashboardsStore } from '@/stores/dashboards'
 
@@ -42,7 +42,11 @@ export function useRecordState(dashboard: Ref<string>, id: Ref<string>, created?
   const reg = shallowRef<Registry | null>(null)
   // реестр правят и другие экраны (настройки дашборда) — карточка видит сразу
   watch(() => dashboards.current(dashboard.value), r => {
-    if (r && reg.value && r !== reg.value) reg.value = r
+    if (!r || !reg.value || r === reg.value) return
+    const replaced = r.dataRev !== reg.value.dataRev
+    reg.value = r
+    // замена эры изменила даты дашборда (F-143) — запись перечитывается
+    if (replaced) void load()
   })
   const rec = shallowRef<RecordDTO | null>(null)
   const related = shallowRef<RelatedDTO>({})
@@ -88,12 +92,17 @@ export function useRecordState(dashboard: Ref<string>, id: Ref<string>, created?
     ask?.resolve(v)
   }
 
-  /** право на правку: в 0.1 — запись владельца не в корзине (F-108: без него — только чтение) */
-  const writable = computed(() => !!rec.value && !rec.value.deleted)
+  /** право на правку: запись не в корзине (F-108: без него — только чтение) и
+   * смотрящему её можно менять (гость — с меткой группы с правкой, F-148) */
+  const writable = computed(() => !!rec.value && !rec.value.deleted && rec.value.editable !== false)
   /** «По месту» (F-108): ручки у полей карточки, пока она не в форме */
   const inlineMode = computed(() => mode.value === 'inline' && writable.value && !editing.value)
   // запись ушла в корзину — правки больше нет (пустая карточка при смене
   // записи — не повод); восстановлена в режиме «Форма» — снова форма (F-108)
+  // права на правку нет (запись перечитана после смены прав) — правки нет
+  watch(writable, w => {
+    if (!w && rec.value && !draft.value) editing.value = false
+  })
   watch(() => rec.value?.deleted, (d, was) => {
     if (d) editing.value = false
     else if (d === false && was === true && mode.value === 'form') editing.value = true
@@ -138,7 +147,7 @@ export function useRecordState(dashboard: Ref<string>, id: Ref<string>, created?
       mode.value = m
       apply(out)
       // «Форма» (F-108): другая запись — сразу в правке, в т. ч. по ссылке и «назад»
-      if (other && m === 'form' && !out.record.deleted) editing.value = true
+      if (other && m === 'form' && writable.value) editing.value = true
     } catch (e) {
       if (my === loadSeq) error.value = errorText(e)
     }
@@ -255,7 +264,8 @@ export function useRecordState(dashboard: Ref<string>, id: Ref<string>, created?
    * Общие свои поля шаблона записи в дашборде целиком (F-96) — с версией
    * шаблона (F-45); ошибка — под ключом SHARED_REV.
    */
-  async function saveShared(list: FieldDef[]): Promise<boolean> {
+  /** общие свои поля шаблона и (если заданы) общие свои блоки (F-96, F-139) */
+  async function saveShared(list: FieldDef[], sections?: CustomSectionDef[]): Promise<boolean> {
     const r = reg.value
     const row = rec.value?.template_id
     const tpl = row ? r?.byRowId.get(row) : undefined
@@ -264,7 +274,9 @@ export function useRecordState(dashboard: Ref<string>, id: Ref<string>, created?
     notice.value = ''
     saving[SHARED_REV] = true
     try {
-      const dto = await api.putSharedFields(dashboard.value, row, { if_rev: tpl.rev ?? 0, custom_fields: list })
+      const dto = await api.putSharedFields(dashboard.value, row, {
+        if_rev: tpl.rev ?? 0, custom_fields: list, ...(sections ? { custom_sections: sections } : {}),
+      })
       reg.value = dashboards.replaceTemplate(dashboard.value, r, dto)
       return true
     } catch (e) {

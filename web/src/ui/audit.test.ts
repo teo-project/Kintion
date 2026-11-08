@@ -27,6 +27,27 @@ describe('журнал: было → стало', () => {
   ])
   const a = auditCtx(ctx, m, [], [{ id: 'g1', name: 'Семья', count: 1, parents: [], children: ['g2'], auto_surname: false, surnames: [] }, { id: 'g2', name: 'Петровы', count: 0, parents: ['g1'], children: [], auto_surname: false, surnames: [] }])
 
+  it('эры дашборда (F-143): настройки; каждая замена эры — своей записью с числом дат; эра в значениях видна всегда', () => {
+    const v = entryView(a, entry({
+      object: 'dashboard', before: { eras: { show: false, edit: false, default: 'ACC', order: [], today: null } },
+      after: { eras: { show: false, edit: false, default: 'AC', order: ['AC', ''], today: { y: -5, e: 'AC' } } },
+    }))
+    expect(v.changes).toEqual([
+      { label: 'Эра по умолчанию', before: 'ACC', after: 'AC' },
+      { label: 'Хронологический порядок', before: '', after: 'AC → без эры' },
+      { label: 'Текущий год мира', before: '', after: '5 до AC' },
+    ])
+    const r = entryView(a, entry({ object: 'dashboard', after: { replace: { from: 'ACC', to: 'AC', changed: 3, default_before: 'ACC', default_after: 'AC' } } }))
+    expect(r.changes).toEqual([{ label: 'Эра в датах (изменено дат: 3)', before: 'ACC', after: 'AC' }])
+    // пустая эра: при пустой эре по умолчанию — «н. э.», иначе — «без эры»
+    const o = entryView(a, entry({ object: 'dashboard', after: { replace: { from: '', to: 'AC', changed: 2, default_before: '', default_after: 'AC' } } }))
+    expect(o.changes).toEqual([{ label: 'Эра в датах (изменено дат: 2)', before: 'н. э.', after: 'AC' }])
+    const n = entryView(a, entry({ object: 'dashboard', after: { replace: { from: 'BC', to: '', changed: 1, default_before: 'AC', default_after: 'AC' } } }))
+    expect(n.changes).toEqual([{ label: 'Эра в датах (изменено дат: 1)', before: 'BC', after: 'без эры' }])
+    const d = entryView(a, entry({ entity_id: 'anna', object: 'entity', before: { start_date: { y: 300, e: 'ACC' } }, after: { start_date: { y: 300, e: 'AC' } } }))
+    expect(d.changes.map(c => [c.before, c.after])).toEqual([['300 ACC', '300 AC']])
+  })
+
   it('вложенность группы (F-105): «Петровы · Входит в» → «Семья»', () => {
     const v = entryView(a, entry({ object: 'grp_link', op: 'create', after: { parent_id: 'g1', child_id: 'g2' } }))
     expect(v.changes).toEqual([{ label: 'Петровы · Входит в', before: '', after: 'Семья' }])
@@ -118,5 +139,31 @@ describe('журнал: было → стало', () => {
     expect(v.purged).toBe(true)
     expect(v.changes[0]!.label).toBe('surname')
     expect(entryView(a, entry({ entity_id: 'anna' })).purged).toBe(false)
+  })
+})
+
+describe('длинные значения в журнале (F-141)', () => {
+  it('начало длинного значения с многоточием, короткое — как есть', async () => {
+    const { clipText, CLIP } = await import('./audit')
+    expect(clipText('коротко')).toBe('коротко')
+    const long = 'а'.repeat(CLIP + 50)
+    expect(clipText(long)).toBe(`${'а'.repeat(CLIP)}…`)
+    expect(clipText('1\n2\n3\n4\n5')).toBe('1\n2\n3…')
+  })
+})
+
+describe('свои блоки в журнале (F-139)', () => {
+  it('блок поля — по названию из того же снимка; блоки записи — по названиям', () => {
+    const ctx = ctxOf(ruSchema(), [])
+    const a = auditCtx(ctx, m, [], [])
+    const v = entryView(a, entry({
+      object: 'entity',
+      before: { custom_fields: [{ key: 'u', type: 'text', name: 'U', section: 'w' }], custom_sections: [{ key: 'w', name: 'Война' }] },
+      after: { custom_fields: [{ key: 'u', type: 'text', name: 'U', section: 'additional' }], custom_sections: [{ key: 'w', name: 'Служба' }] },
+    }))
+    const fields = v.changes.find(c => c.before.includes('U'))!
+    expect(fields.before).toContain('Война')
+    expect(fields.after).toContain(m.sections.additional)
+    expect(v.changes.find(c => c.before === 'Война')!.after).toBe('Служба')
   })
 })

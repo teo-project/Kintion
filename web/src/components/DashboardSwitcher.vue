@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // Переключатель дашбордов (F-01) и создание нового.
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle, DialogTrigger } from 'reka-ui'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { errorText, t } from '@/i18n'
+import type { DashboardDTO } from '@/api/types'
+import { errorText, fmt, t } from '@/i18n'
 import DashboardSettings from './DashboardSettings.vue'
 import KinIcon from './KinIcon.vue'
 import { useDashboardsStore } from '@/stores/dashboards'
@@ -35,6 +36,13 @@ function go(e: Event) {
   void router.push({ name, params: { d: id }, query: v })
 }
 
+// чужой дашборд (F-03): в списке — с ником владельца, настройки — только просмотр
+const guest = computed(() => dashboards.isGuest(props.current))
+function label(d: DashboardDTO): string {
+  if (!d.guest) return d.name
+  return `${d.name} · ${fmt(t.sharing.guestOf, { owner: d.owner_nick ?? t.sharing.someone })}`
+}
+
 async function create() {
   error.value = ''
   try {
@@ -62,7 +70,7 @@ async function create() {
         :key="d.id"
         :value="d.id"
       >
-        {{ d.name }}
+        {{ label(d) }}
       </option>
     </select>
     <button
@@ -91,6 +99,7 @@ async function create() {
     </button>
     <DashboardSettings
       v-model:open="settingsOpen"
+      :readonly="guest"
       :dashboard="current"
       :name="dashboards.list.find(x => x.id === current)?.name ?? ''"
     />

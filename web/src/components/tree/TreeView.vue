@@ -24,9 +24,10 @@ import type { Registry } from '@/core/registry'
 import { personView, treeInput } from '@/core/tree/graph'
 import { BADGE_D, refBadges, type RefBadge } from '@/core/tree/badges'
 import { edgeOpen } from '@/core/tree/edgeOpen'
-import { upLines } from '@/core/tree/highlight'
+import { jointLines, litSiblings, upLines } from '@/core/tree/highlight'
 import { personsInBox, toggle } from '@/core/tree/select'
 import { labelLines, layoutTree, PERSON_H, PERSON_W, PHOTO_MID, ROW } from '@/core/tree/layout'
+import type { TreeEdge } from '@/core/tree/model'
 import { errorText, fmt, t } from '@/i18n'
 import { makeCtx } from '@/ui/ctx'
 import { setTreePrefs, treePrefs } from '@/ui/prefs'
@@ -34,9 +35,13 @@ import RecordView from '@/views/RecordView.vue'
 
 import TreeQuickAdd from './TreeQuickAdd.vue'
 import TreeSelection from './TreeSelection.vue'
+import { useDashboardsStore } from '@/stores/dashboards'
 
 /** focus — человек в центре при открытии (F-129, иконка дерева в «Связях») */
-const props = defineProps<{ d: string; reg: Registry; group: string; focus?: string }>()
+/** readonly — нельзя создавать (гость без права правки, F-148): без «+» у узлов */
+const props = defineProps<{ d: string; reg: Registry; group: string; focus?: string; readonly?: boolean }>()
+// гостю у выделения — без редактора групп (группы — у владельца, F-148)
+const guest = computed(() => useDashboardsStore().isGuest(props.d))
 /** groups — создана группа (список групп фильтра перечитать) */
 const emit = defineEmits<{ groups: [] }>()
 
@@ -44,6 +49,8 @@ const DEPTHS = [3, 5, 7, 10, 99]
 const depth = ref(10)
 const ribbon = ref(true)
 const hideDead = ref(false)
+/** кого «Скрыть умерших» не прячет: переход по иконке дерева (F-136); сбрасывается правкой галочки */
+const shownAnyway = ref<string[]>([])
 const prefsReady = ref(false)
 onMounted(async () => {
   const p = await treePrefs()
@@ -63,14 +70,18 @@ let seq = 0
 let loads = 0
 /** удачных загрузок дерева */
 let treeLoads = 0
+/** дашборд и группа, по которым загружено показанное дерево */
+let loadedKey = ''
 /** keep — сохранить вид (закрытие карточки, F-120); иначе новые данные вписываются */
 async function load(keep = false): Promise<boolean> {
   const my = ++seq
+  const key = `${props.d}|${props.group}`
   try {
     const out = await api.tree(props.d, props.group || undefined)
     if (my === seq) {
       if (!keep) loads++
       treeLoads++
+      loadedKey = key
       tree.value = out
       error.value = ''
       return true
@@ -83,6 +94,8 @@ async function load(keep = false): Promise<boolean> {
 // другие данные или фильтры — прежнее «не видно» уже не о них
 watch(() => [props.d, props.group, depth.value, hideDead.value], () => (notice.value = ''))
 watch(() => [props.d, props.group], () => void load(), { immediate: true })
+// замена эры изменила даты дашборда (F-143) — дерево перечитывается
+watch(() => props.reg.dataRev, () => void load(true))
 
 const ctx = computed(() => (tree.value ? makeCtx(props.reg, [...tree.value.relations, ...tree.value.records]) : null))
 const input = computed(() => (ctx.value && tree.value ? treeInput(ctx.value, tree.value.relations, tree.value.records) : null))
@@ -111,7 +124,7 @@ const measure = (() => {
 })()
 const layout = computed(() => {
   void fontsVersion.value
-  return input.value ? layoutTree(input.value, { depth: depth.value, hideDead: hideDead.value, measure }) : null
+  return input.value ? layoutTree(input.value, { depth: depth.value, hideDead: hideDead.value, reveal: shownAnyway.value, measure }) : null
 })
 
 const flowId = `tree-${Math.random().toString(36).slice(2)}`
@@ -157,13 +170,18 @@ function onEdgeTap(id: string) {
 }
 const litEdges = computed(() => {
   const e = hoverEdge.value ?? tapEdge.value
-  return layout.value && e ? upLines(layout.value, e) : new Set<string>()
+  if (!layout.value) return new Set<string>()
+  if (e) return upLines(layout.value, e)
+  // плашка пары из трёх и более (F-136) или «Брат / сестра» — все линии к участникам
+  return hover.value ? jointLines(layout.value, hover.value) : new Set<string>()
 })
+/** плашка «Брат / сестра», подсвеченная вместе со своими линиями */
+const litSib = computed(() => (layout.value ? litSiblings(layout.value, hoverEdge.value ?? tapEdge.value, hover.value) : null))
 const edges = computed<Edge[]>(() => {
   if (!layout.value) return []
-  const out: Edge[] = layout.value.edges.map(e => ({
+  const out: Edge[] = layout.value.edges.map((e, i) => ({
     id: e.id,
-    type: e.type,
+    type: e.arc || e.under?.length ? 'under' : e.type,
     source: e.source,
     target: e.target,
     sourceHandle: e.sourceHandle,
@@ -171,7 +189,7 @@ const edges = computed<Edge[]>(() => {
     label: e.label,
     zIndex: litEdges.value.has(e.id) ? 1 : 0,
     style: litEdges.value.has(e.id) ? (e.dashed ? { ...lit, strokeDasharray: '5 4' } : lit) : e.dashed ? dashed : line,
-    data: { busY: e.busY, via: e.via },
+    data: { busY: e.busY, via: e.via, under: e.under ?? [], arc: e.arc, mask: `${flowId}-under-${i}` },
   }))
   // линия «телепортации» отсылка → значок на основном узле (F-117)
   const h = hover.value
@@ -204,11 +222,13 @@ function focusZoom(): number {
 
 /** кого центрировать после пересчёта: человек из «Связей» или созданный из дерева (F-129); zoom 0 — «±1,5 поколения» */
 /** after — номер загрузки дерева, после которой решать (созданное из дерева: до перечитывания его ещё нет) */
-let centerNext: { id: string; zoom: number; after?: number } | null = null
+/** wait — номер загрузки, раньше которой не центрировать: дерево ещё по прежнему фильтру (переход из «Связей», F-136) */
+let centerNext: { id: string; zoom: number; after?: number; wait?: number } | null = null
 
 /** центрировать отложенное, если узел уже есть */
 function centerPending(): boolean {
   const c = centerNext
+  if (c?.wait && c.wait > treeLoads) return false
   const n = c ? personNode(c.id) : undefined
   if (!c || !n) return false
   centerNext = null
@@ -224,12 +244,14 @@ watch(layout, l => {
   // tree.value — новые данные (быстрое добавление, правка в карточке) тоже вписываются
   const key = `${props.d}|${props.group}|${depth.value}|${hideDead.value}|${loads}`
   if (!l) return
-  if (centerNext && (centerNext.after ?? 0) <= treeLoads && !personNode(centerNext.id)) {
+  // переход из «Связей» сменил фильтр (F-136): старое дерево не вписывать — ждать новое
+  if (centerNext?.wait && centerNext.wait > treeLoads) return
+  if (centerNext && (centerNext.after ?? centerNext.wait ?? 0) <= treeLoads && !personNode(centerNext.id)) {
     const want = centerNext.id
     const wanted = input.value?.persons.find(p => p.id === want)
     // отсечён глубиной — показать все поколения (глубина — только на странице, F-120);
-    // скрытый умерший («Скрыть умерших») глубиной не вернуть
-    if (wanted && depth.value !== 99 && !(hideDead.value && wanted.dead)) {
+    // скрытый умерший («Скрыть умерших») глубиной не вернуть; человек из «Связей» умершим не прячется (shownAnyway)
+    if (wanted && depth.value !== 99 && !(hideDead.value && wanted.dead && !shownAnyway.value.includes(want))) {
       depth.value = 99
       return
     }
@@ -273,6 +295,42 @@ const SIDE = { top: Position.Top, right: Position.Right, bottom: Position.Bottom
 function telePath(p: EdgeProps): string {
   const d = p.data as { x: number; y: number; side: RefBadge['side'] }
   return getBezierPath({ sourceX: p.sourceX, sourceY: p.sourceY, sourcePosition: Position.Top, targetX: d.x, targetY: d.y, targetPosition: SIDE[d.side] })[0]
+}
+
+/** длина затухания линии у края карточки, под которую она уходит (F-136) */
+const UNDER_FADE = 14
+type Arc = NonNullable<TreeEdge['arc']>
+const arcOf = (p: EdgeProps) => (p.data as { arc?: Arc }).arc
+/**
+ * Линия пары из трёх и более (F-136): прямая или дуга от плашки — вверх из её
+ * верха, горизонталь на своей высоте, у участника — плавный спуск к его боку.
+ */
+function underPath(p: EdgeProps): string {
+  const a = arcOf(p)
+  if (!a) return `M ${p.sourceX} ${p.sourceY} L ${p.targetX} ${p.targetY}`
+  const r = Math.min(8, Math.max(0, a.top - a.y))
+  if (a.at === 'source') {
+    const dir = Math.sign(p.targetX - a.x) || 1
+    const h = p.targetX - dir * a.d
+    const m = p.targetX - (dir * a.d) / 2
+    return `M ${a.x} ${a.top} V ${a.y + r} Q ${a.x} ${a.y} ${a.x + dir * r} ${a.y} H ${h} C ${m} ${a.y} ${m} ${p.targetY} ${p.targetX} ${p.targetY}`
+  }
+  const dir = Math.sign(a.x - p.sourceX) || 1
+  const h = p.sourceX + dir * a.d
+  const m = p.sourceX + (dir * a.d) / 2
+  return `M ${p.sourceX} ${p.sourceY} C ${m} ${p.sourceY} ${m} ${a.y} ${h} ${a.y} H ${a.x - dir * r} Q ${a.x} ${a.y} ${a.x} ${a.y + r} V ${a.top}`
+}
+/** Линия под карточками (F-136): маска гасит линию к краю карточки и проявляет после неё. */
+function underMask(p: EdgeProps) {
+  const under = (p.data as { under: { x0: number; x1: number }[] }).under.map(u => [u.x0, u.x1] as const)
+  const a = arcOf(p)
+  const xs = [p.sourceX, p.targetX, ...(a ? [a.x] : [])]
+  const ys = [p.sourceY, p.targetY, ...(a ? [a.y, a.top] : [])]
+  const x0 = Math.min(...xs) - 8
+  const x1 = Math.max(...xs) + 8
+  const y = Math.min(...ys) - 8
+  const h = Math.max(...ys) - Math.min(...ys) + 16
+  return { x: x0, y, w: x1 - x0, h, fades: under.flatMap(([a, b]) => [{ x: a - UNDER_FADE, dir: 'in' as const }, { x: b, dir: 'out' as const }]), under }
 }
 
 function busPath(p: EdgeProps): string {
@@ -503,7 +561,13 @@ watch(() => props.focus, f => {
   if (!f) return
   card.value = null
   menu.value = null
-  centerNext = { id: f, zoom: 0 }
+  // переход сменил фильтр группы (ссылка без g) — центрировать по дереву с новым фильтром
+  const stale = loadedKey !== `${props.d}|${props.group}`
+  centerNext = { id: f, zoom: 0, ...(stale ? { wait: treeLoads + 1 } : {}) }
+  // уже запланированное вписывание старого дерева не нужно
+  if (stale) fitPending = false
+  // показать обязательно (F-136): «Скрыть умерших» его не прячет, глубина — до всех поколений
+  shownAnyway.value = [f]
   if (layout.value) centerPending()
 }, { immediate: true })
 
@@ -530,7 +594,10 @@ const letter = (s: string) => s.trim().charAt(0).toUpperCase() || '·'
       <KinCheckbox v-model="ribbon">
         {{ t.tree.ribbon }}
       </KinCheckbox>
-      <KinCheckbox v-model="hideDead">
+      <KinCheckbox
+        v-model="hideDead"
+        @update:model-value="shownAnyway = []"
+      >
         {{ t.tree.hideDead }}
       </KinCheckbox>
       <button
@@ -646,6 +713,7 @@ const letter = (s: string) => s.trim().charAt(0).toUpperCase() || '·'
               {{ data.view.note }}
             </div>
             <button
+              v-if="!readonly"
               class="tn-plus nodrag nopan"
               type="button"
               :aria-label="t.tree.add"
@@ -754,9 +822,10 @@ const letter = (s: string) => s.trim().charAt(0).toUpperCase() || '·'
             >{{ s }}</span>
           </div>
         </template>
-        <template #node-siblings="{ data }">
+        <template #node-siblings="{ id, data }">
           <div
             class="tn-union"
+            :class="{ 'is-lit': litSib === id }"
             :style="{ minWidth: `${data.w}px`, minHeight: `${data.h}px` }"
           >
             <Handle
@@ -804,6 +873,77 @@ const letter = (s: string) => s.trim().charAt(0).toUpperCase() || '·'
             :style="p.style"
           />
         </template>
+        <template #edge-under="p">
+          <defs>
+            <linearGradient
+              :id="`${p.data.mask}-in`"
+            >
+              <stop
+                offset="0"
+                stop-color="#fff"
+              />
+              <stop
+                offset="1"
+                stop-color="#fff"
+                stop-opacity="0.1"
+              />
+            </linearGradient>
+            <linearGradient
+              :id="`${p.data.mask}-out`"
+            >
+              <stop
+                offset="0"
+                stop-color="#fff"
+                stop-opacity="0.1"
+              />
+              <stop
+                offset="1"
+                stop-color="#fff"
+              />
+            </linearGradient>
+            <mask
+              :id="p.data.mask"
+              maskUnits="userSpaceOnUse"
+              :x="underMask(p).x"
+              :y="underMask(p).y"
+              :width="underMask(p).w"
+              :height="underMask(p).h"
+            >
+              <rect
+                :x="underMask(p).x"
+                :y="underMask(p).y"
+                :width="underMask(p).w"
+                :height="underMask(p).h"
+                fill="#fff"
+              />
+              <rect
+                v-for="([a, b], k) in underMask(p).under"
+                :key="`u${k}`"
+                :x="a"
+                :y="underMask(p).y"
+                :width="b - a"
+                :height="underMask(p).h"
+                fill="#000"
+              />
+              <rect
+                v-for="(f, k) in underMask(p).fades"
+                :key="`f${k}`"
+                :x="f.x"
+                :y="underMask(p).y"
+                :width="UNDER_FADE"
+                :height="underMask(p).h"
+                :fill="`url(#${p.data.mask}-${f.dir})`"
+              />
+            </mask>
+          </defs>
+          <BaseEdge
+            :id="p.id"
+            class="tn-under"
+            :path="underPath(p)"
+            :style="p.style"
+            :mask="`url(#${p.data.mask})`"
+          />
+        </template>
         <template #edge-bus="p">
           <BaseEdge
             :id="p.id"
@@ -835,6 +975,7 @@ const letter = (s: string) => s.trim().charAt(0).toUpperCase() || '·'
       <TreeSelection
         v-if="selected.size"
         :d="d"
+        :readonly="guest"
         :ids="selectedIds"
         @clear="selected = new Set()"
         @changed="onSelChanged"
@@ -1164,6 +1305,10 @@ const letter = (s: string) => s.trim().charAt(0).toUpperCase() || '·'
   text-align: center;
   white-space: nowrap;
   cursor: pointer;
+}
+.tn-union.is-lit {
+  border-color: var(--kin-color-accent);
+  color: var(--kin-color-text);
 }
 
 /* слой подписей — над всеми линиями, включая подсвеченные (F-127) */

@@ -65,7 +65,7 @@ const recentGroupsLimit = 4
 // уникальных групп, назначенных этим пользователем (F-81), новые первыми.
 func (a *API) recentGroups(w http.ResponseWriter, r *http.Request) {
 	sess, _ := SessionFrom(r.Context())
-	a.inDashboard(w, r, http.StatusOK, func(t *records.Tx) (any, error) {
+	a.inView(w, r, func(t *records.Tx) (any, error) {
 		ids, err := t.RecentGroups(sess.Account.ID, recentGroupsLimit)
 		if ids == nil {
 			ids = []uuid.UUID{}
@@ -98,7 +98,7 @@ func (a *API) listRecords(w http.ResponseWriter, r *http.Request) {
 	if lq.Group, ok = groupParam(w, r); !ok {
 		return
 	}
-	a.inDashboard(w, r, http.StatusOK, func(t *records.Tx) (any, error) {
+	a.inView(w, r, func(t *records.Tx) (any, error) {
 		recs, total, err := t.List(lq)
 		if err != nil {
 			return nil, err
@@ -137,13 +137,11 @@ func (a *API) tree(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.inDashboard(w, r, http.StatusOK, func(t *records.Tx) (any, error) {
-		return t.Tree(group)
-	})
+	a.inView(w, r, func(t *records.Tx) (any, error) { return t.Tree(group) })
 }
 
 func (a *API) listGroups(w http.ResponseWriter, r *http.Request) {
-	a.inDashboard(w, r, http.StatusOK, func(t *records.Tx) (any, error) { return t.Groups() })
+	a.inView(w, r, func(t *records.Tx) (any, error) { return t.Groups() })
 }
 
 func (a *API) createGroup(w http.ResponseWriter, r *http.Request) {

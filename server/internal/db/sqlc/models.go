@@ -52,6 +52,15 @@ type Dashboard struct {
 	Name      string
 	CreatedAt time.Time
 	DeletedAt *time.Time
+	Eras      []byte
+}
+
+type DashboardMember struct {
+	DashboardID uuid.UUID
+	AccountID   uuid.UUID
+	InvitedBy   *uuid.UUID
+	CreatedAt   time.Time
+	AcceptedAt  *time.Time
 }
 
 type DashboardTemplate struct {
@@ -67,23 +76,24 @@ type DashboardTemplate struct {
 }
 
 type Entity struct {
-	ID           uuid.UUID
-	DashboardID  uuid.UUID
-	Entity       string
-	TemplateID   uuid.UUID
-	StartDate    *partialdate.Date
-	StartLink    *uuid.UUID
-	EndDate      *partialdate.Date
-	EndLink      *uuid.UUID
-	Note         *string
-	TitleManual  *string
-	Sensitive    bool
-	CustomFields []byte
-	CreatedBy    *uuid.UUID
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    *time.Time
-	DeletedBy    *uuid.UUID
+	ID             uuid.UUID
+	DashboardID    uuid.UUID
+	Entity         string
+	TemplateID     uuid.UUID
+	StartDate      *partialdate.Date
+	StartLink      *uuid.UUID
+	EndDate        *partialdate.Date
+	EndLink        *uuid.UUID
+	Note           *string
+	TitleManual    *string
+	Sensitive      bool
+	CustomFields   []byte
+	CreatedBy      *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+	DeletedBy      *uuid.UUID
+	CustomSections []byte
 }
 
 type EntityGroup struct {
@@ -146,12 +156,31 @@ type Grp struct {
 	SortKey     string
 	AutoSurname bool
 	Surnames    []string
+	CreatedFor  *uuid.UUID
+}
+
+type GrpGrant struct {
+	DashboardID uuid.UUID
+	GroupID     uuid.UUID
+	AccountID   uuid.UUID
+	CanEdit     bool
+	CreatedAt   time.Time
 }
 
 type GrpLink struct {
 	DashboardID uuid.UUID
 	ParentID    uuid.UUID
 	ChildID     uuid.UUID
+}
+
+type InstanceInvite struct {
+	ID        uuid.UUID
+	TokenHash []byte
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	UsedBy    *uuid.UUID
 }
 
 type Pack struct {

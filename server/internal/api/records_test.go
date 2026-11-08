@@ -245,3 +245,28 @@ func TestInactiveTemplateHidden(t *testing.T) {
 	expect(t, c.do("GET", "/api/records/"+id, nil), http.StatusNotFound, "inactive template")
 	batch(t, c, dash, map[string]any{"records": []any{map[string]any{"entity": "kin.core.person"}}}, http.StatusBadRequest)
 }
+
+// Год со знаком и эра (F-14): дата до начала эры и дата с эрой сохраняются
+// и возвращаются как есть; год 0 и эра без года — ошибка проверки.
+func TestSignedYearAndEra(t *testing.T) {
+	e := newEnv(t)
+	c := e.setupOwner()
+	dash := dashboardOf(t, c)
+	path := "/api/records/" + person(t, c, dash, nil)
+
+	r := c.do("PATCH", path, map[string]any{"if_rev": 0, "start": map[string]any{"value": map[string]any{"y": -500, "m": 3, "e": "AC"}}})
+	expect(t, r, http.StatusOK, "era")
+	start, _ := record(r)["start"].(map[string]any)
+	v, _ := start["value"].(map[string]any)
+	if v["y"] != float64(-500) || v["m"] != float64(3) || v["e"] != "AC" || v["d"] != nil {
+		t.Fatalf("start %v", record(r)["start"])
+	}
+	expect(t, c.do("PATCH", path, map[string]any{"if_rev": 1, "start": map[string]any{"value": map[string]any{"y": 0}}}), http.StatusBadRequest, "year 0")
+	expect(t, c.do("PATCH", path, map[string]any{"if_rev": 1, "start": map[string]any{"value": map[string]any{"m": 3, "e": "AC"}}}), http.StatusBadRequest, "era without year")
+	r = c.do("PATCH", path, map[string]any{"if_rev": 1, "start": map[string]any{"value": map[string]any{"y": -44, "m": 3, "d": 15}}})
+	expect(t, r, http.StatusOK, "bc")
+	start, _ = record(r)["start"].(map[string]any)
+	if v, _ := start["value"].(map[string]any); v["y"] != float64(-44) || v["e"] != nil {
+		t.Fatalf("start %v", start)
+	}
+}

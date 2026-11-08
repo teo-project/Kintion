@@ -232,6 +232,25 @@ func (q *Queries) InsertBootstrap(ctx context.Context, tokenHash []byte) error {
 	return err
 }
 
+const lockAccount = `-- name: LockAccount :one
+SELECT id, login, password_hash, nick, is_admin, created_at, prefs FROM account WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockAccount(ctx context.Context, id uuid.UUID) (Account, error) {
+	row := q.db.QueryRow(ctx, lockAccount, id)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.PasswordHash,
+		&i.Nick,
+		&i.IsAdmin,
+		&i.CreatedAt,
+		&i.Prefs,
+	)
+	return i, err
+}
+
 const lockBootstrap = `-- name: LockBootstrap :one
 SELECT token_hash, created_at, used_at FROM bootstrap WHERE token_hash = $1 FOR UPDATE
 `

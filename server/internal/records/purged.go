@@ -69,11 +69,14 @@ func (t *Tx) Purged(ids []uuid.UUID) (map[uuid.UUID]*RecordDTO, error) {
 			ID: id, Entity: s.Entity, Template: tm.T.ID, TemplateID: s.TemplateID,
 			Start: period(s.StartDate, nil), End: period(s.EndDate, nil),
 			TitleManual: s.TitleManual, Groups: []uuid.UUID{}, CustomFields: []json.RawMessage{},
-			Fields: map[string]*FieldDTO{}, Revs: map[string]int64{}, Participants: []ParticipantDTO{},
+			CustomSections: []json.RawMessage{}, Fields: map[string]*FieldDTO{}, Revs: map[string]int64{}, Participants: []ParticipantDTO{},
 			ParticipatesIn: []ParticipationDTO{}, Deleted: true,
 		}
 		if len(s.CustomFields) > 0 {
 			_ = json.Unmarshal(s.CustomFields, &d.CustomFields)
+		}
+		if len(s.CustomSections) > 0 {
+			_ = json.Unmarshal(s.CustomSections, &d.CustomSections)
 		}
 		custom, _ := customDefs(s.CustomFields)
 		// тип поля — по шаблону, своим полям записи и общим полям шаблона

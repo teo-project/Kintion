@@ -22,6 +22,12 @@ Behind this is a pattern. Tools offer either a good contact book without a time 
 
 No tool I found modelled a relationship as a full historical entity, so Kintion starts from there. **A relationship is a record of its own**, with participants, roles, stages, dates and a history. **A field is a list of values**, not a value, and the top one is simply the current one. **A date may be partial**, and an unknown part stays unknown instead of being guessed. Everything that changes is written to a detailed log. And because "what is a family" differs between cultures and people, the domain knowledge is not in the code at all: it comes from **packs** that you can read, translate and extend.
 
+## Public 0.2
+
+Share selected groups with other accounts, with view or edit access. Guests can create records when allowed, while the rest of your dashboard stays private. This version also adds account invitations and dashboard eras for historical and fictional dates.
+
+[Release notes](RELEASE_NOTES.md) · [Sharing guide](docs/sharing.md)
+
 ## Install
 
 Needs Docker with Compose v2.
@@ -62,8 +68,12 @@ Open <http://localhost:8080>, enter the setup token from the log and choose the 
 | [deploy/](deploy/) | Dockerfile, Compose file, `.env` example |
 | [pack-storage/](pack-storage/) | the bundled packs |
 
+## Contributing
+
+Bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Contributors sign the [Contributor License Agreement](CLA.md) once (the CLA bot asks on the first pull request). Security problems: [SECURITY.md](SECURITY.md).
+
 ## License
 
 [Apache License 2.0](LICENSE). You may use, modify and redistribute Kintion, including commercially; keep the copyright and license notices ([NOTICE](NOTICE)) and mark files you changed. The software is provided as is, without warranty, and there is no obligation to maintain or finish it. The name "Kintion" and its logo are not part of the license: a modified or resold copy must not present itself as the official Kintion. The official source is this repository, and the original is free.
 
-Status: early software — a single owner account, local sign-in, no sharing yet.
+Status: early software — local sign-in; registration by invitation; sharing groups with other accounts (view or edit).

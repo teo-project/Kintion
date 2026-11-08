@@ -182,6 +182,12 @@ func (t *Tx) insertParticipation(c *Rec, member uuid.UUID, role string, from, to
 	if err != nil {
 		return sqlc.Participation{}, err
 	}
+	if err := t.checkEraYear("valid_from", from, nil); err != nil {
+		return sqlc.Participation{}, err
+	}
+	if err := t.checkEraYear("valid_to", to, nil); err != nil {
+		return sqlc.Participation{}, err
+	}
 	p, err := t.q.InsertParticipation(t.ctx, sqlc.InsertParticipationParams{
 		ID: newID(), DashboardID: t.Dashboard, ContainerID: c.Row.ID, EntityID: member, Role: role,
 		ValidFrom: from, ValidTo: to, Note: normText(note), SortKey: sk,
@@ -251,7 +257,8 @@ func (t *Tx) AddParticipant(r *Rec, in AddParticipant) (*Rec, error) {
 
 func (t *Tx) participation(r *Rec, pid uuid.UUID) (sqlc.Participation, error) {
 	p, err := t.q.GetParticipation(t.ctx, sqlc.GetParticipationParams{DashboardID: t.Dashboard, ID: pid})
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && p.ContainerID != r.Row.ID) {
+	// невидимый гостю участник — как несуществующий (F-05)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (p.ContainerID != r.Row.ID || !t.inScope(p.EntityID))) {
 		return p, ErrNotFound
 	}
 	return p, err
@@ -272,9 +279,15 @@ func (t *Tx) PatchParticipant(r *Rec, pid uuid.UUID, in PatchParticipant) (*Rec,
 	}
 	p := old
 	if in.ValidFrom.Set {
+		if err := t.checkEraYear("valid_from", in.ValidFrom.V, old.ValidFrom); err != nil {
+			return nil, err
+		}
 		p.ValidFrom = in.ValidFrom.V
 	}
 	if in.ValidTo.Set {
+		if err := t.checkEraYear("valid_to", in.ValidTo.V, old.ValidTo); err != nil {
+			return nil, err
+		}
 		p.ValidTo = in.ValidTo.V
 	}
 	if in.Note.Set {
@@ -346,6 +359,9 @@ func (t *Tx) createParticipants(b Batch, res *BatchResult, refs *batchRefs) erro
 			row, err := t.target(cid, field+".container")
 			if err != nil {
 				return err
+			}
+			if !t.CanEdit(cid) { // участник в существующую запись — только где у гостя правка (F-148)
+				return ErrForbidden
 			}
 			if c, err = t.Record(row); err != nil {
 				return err

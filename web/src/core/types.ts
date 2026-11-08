@@ -56,8 +56,8 @@ export interface MetaDef {
 }
 
 export type FieldType =
-  | 'text' | 'number' | 'partial_date' | 'bool' | 'choice' | 'ref' | 'image'
-  | 'place' | 'phone' | 'email' | 'url' | 'contact'
+  | 'text' | 'number' | 'partial_date' | 'bool' | 'choice' | 'ref' | 'image' | 'file'
+  | 'place' | 'phone' | 'email' | 'url' | 'contact' | 'rich_text'
 
 export interface FieldDef {
   key: string
@@ -76,6 +76,12 @@ export interface FieldDef {
   /** ссылка на запись: допустимые сущности цели; нет — любые */
   entities?: string[]
   [k: string]: unknown
+}
+
+/** Свой блок карточки (F-139): ключ и название. */
+export interface CustomSectionDef {
+  key: string
+  name: string
 }
 
 /** Вариант выбора: вид линии в дереве и формы ролей, как у этапа (F-118). */
@@ -183,6 +189,8 @@ export interface TemplateDef {
   links_rank?: number
   /** общие свои поля шаблона в дашборде (F-96), значения — `shared.<key>` */
   custom_fields?: FieldDef[]
+  /** общие свои блоки шаблона в дашборде (F-139) */
+  custom_sections?: CustomSectionDef[]
   ui?: { quick_add?: QuickAddItem[] }
   tree_link?: boolean | TreeLinkDef
   /** подпись узла в дереве (F-116); нет — `title` */
@@ -214,6 +222,37 @@ export interface SchemaDTO {
   language: string
   entities: EntityDef[]
   templates: SchemaTemplateDTO[]
+  /** эры дашборда (F-143); нет — по умолчанию */
+  eras?: ErasDTO
+}
+
+/** Годы эры (F-143): минимальный и максимальный, каждый необязателен. */
+export interface EraYears {
+  min?: number | null
+  max?: number | null
+}
+
+/** Эры — настройки дашборда (F-143). */
+export interface ErasSettings {
+  /** показывать эру у дат */
+  show: boolean
+  /** менять эру в формах; нет — даты сохраняются с эрой по умолчанию */
+  edit: boolean
+  /** эра по умолчанию; '' — наша */
+  default: string
+  /** хронологический порядок, заданный админом ('' — наша эра) */
+  order: string[]
+  /** необязательные минимальный и максимальный год эры; min > max — счёт обратный */
+  years?: Record<string, EraYears>
+  /** текущий год мира (год и эра); null — настоящая дата */
+  today: PartialDate | null
+  /** версия настроек (F-45) */
+  rev?: number
+}
+
+/** Эры дашборда: настройки и действующий список эр по порядку (новые — наверху): эры из дат, эра по умолчанию и года мира. */
+export interface ErasDTO extends ErasSettings {
+  list: string[]
 }
 
 // ---------- API: конверт записи ----------
@@ -247,6 +286,8 @@ export interface ValueDTO {
 export interface FieldDTO {
   rev: number
   values: ValueDTO[]
+  /** одиночное поле занято значением, скрытым от гостя (Q-50): «Задано», без правки */
+  hidden?: boolean
 }
 
 export interface ParticipantDTO {
@@ -282,11 +323,15 @@ export interface RecordDTO {
   groups: string[]
   /** описания свободных полей (F-75): та же форма, что поле шаблона; значения — `custom.<key>` */
   custom_fields: FieldDef[]
+  /** свои блоки записи (F-139); в старых эталонах может не быть */
+  custom_sections?: CustomSectionDef[]
   fields: Record<string, FieldDTO | undefined>
   revs?: Record<string, number>
   participants: ParticipantDTO[]
   participates_in: ParticipationDTO[]
   deleted: boolean
+  /** смотрящий может изменять запись (гость — с меткой группы с правкой, F-148) */
+  editable?: boolean
 }
 
 // ---------- API: пакетная операция (POST /api/dashboards/{d}/operations) ----------

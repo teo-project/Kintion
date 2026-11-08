@@ -3,13 +3,13 @@
 // (F-74), связи — из participates_in, полей-ссылок и related; порядок
 // раздела «Связи» — F-93 (внутри групп — Д-27).
 
-import { formatDate, hi, isEmptyDate, sortKey } from './dates'
+import { compareKeys, formatDate, hiKey, isEmptyDate, loKey, sortKey } from './dates'
 import { activeToday, currentStage, flagEnded, roleLabel } from './forms'
 import { linksRank, periodHiddenWhenEmpty, periodLabel, showsLinks, systemLabel, type SystemKey } from './registry'
 import {
   CUSTOM_PREFIX, NOTE, recordTitle, recordTitleById, SHARED_PREFIX, STAGE, storedRaw, tplOf, valuesOf, valueText, type Ctx,
 } from './resolver'
-import type { FieldDef, MetaDef, PartialDate, RecordDTO, StageDef, TemplateDef, ValueDTO } from './types'
+import type { CustomSectionDef, FieldDef, MetaDef, PartialDate, RecordDTO, StageDef, TemplateDef, ValueDTO } from './types'
 
 /** Поле картинки записи (F-72). */
 export const PHOTO = 'photo'
@@ -38,6 +38,10 @@ export interface FieldView {
   empty: boolean
   /** `show: filled` и пусто — поле прячется за «Добавить» */
   hidden: boolean
+  /** занято значением, скрытым от гостя (Q-50): «Задано», без правки */
+  occupied?: boolean
+  /** поле быстрой формы дашборда (`quick_fields` с переопределением, F-124): в правке стоит сразу, даже пустое */
+  quick: boolean
   /** что показать на карточке: текущее (верхнее) или все (multiple) */
   shown: string[]
   values: ValueView[]
@@ -49,6 +53,37 @@ export interface SectionView {
   fields: FieldView[]
   /** скрытые пустые поля — для «Добавить» */
   addable: FieldView[]
+  /** свой блок (F-139): описание и область — запись или весь шаблон в дашборде */
+  custom?: { def: CustomSectionDef; shared: boolean }
+}
+
+/** Блок, куда можно поставить своё поле (F-139): блоки шаблона, «Свои поля», свои блоки. */
+export interface SectionChoice {
+  key: string
+  name: string
+  /** свой блок записи — только для поля записи, не для общего */
+  own: boolean
+}
+
+/**
+ * Блоки карточки по порядку (F-139): блоки полей шаблона (основной — всегда),
+ * «Свои поля», затем свои блоки — общие шаблона, потом записи.
+ */
+export function sectionChoices(ctx: Ctx, rec: RecordDTO): SectionChoice[] {
+  const tpl = tplOf(ctx, rec)
+  const out: SectionChoice[] = []
+  const add = (key: string, name: string, own = false) => {
+    if (!out.some(s => s.key === key)) out.push({ key, name, own })
+  }
+  add(MAIN_SECTION, ctx.words.sections[MAIN_SECTION] ?? MAIN_SECTION)
+  for (const f of tpl?.fields ?? []) {
+    const k = f.section ?? MAIN_SECTION
+    add(k, ctx.words.sections[k] ?? k)
+  }
+  add(CUSTOM_SECTION, ctx.words.sections[CUSTOM_SECTION] ?? CUSTOM_SECTION)
+  for (const s of tpl?.custom_sections ?? []) add(s.key, s.name)
+  for (const s of rec.custom_sections ?? []) add(s.key, s.name, true)
+  return out
 }
 
 export interface DateView {
@@ -59,6 +94,8 @@ export interface DateView {
   link: { id: string; title: string } | null
   /** `show: filled` в period и пусто — дата прячется за «Добавить» (F-99) */
   hidden: boolean
+  /** дата в быстрой форме дашборда (F-124): в правке стоит сразу, даже пустая */
+  quick: boolean
 }
 
 export interface StageView {
@@ -154,8 +191,8 @@ function valueView(ctx: Ctx, def: Pick<FieldDef, 'type' | 'options'> | undefined
   return {
     id: v.id,
     text: valueText(ctx, def, storedRaw(v)),
-    from: formatDate(v.valid_from, ctx.words.dates),
-    to: formatDate(v.valid_to, ctx.words.dates),
+    from: formatDate(v.valid_from, ctx.words.dates, ctx.dateView),
+    to: formatDate(v.valid_to, ctx.words.dates, ctx.dateView),
     note: v.note,
     meta: Object.entries(v.meta ?? {}).map(([key, value]) => ({
       key, value, name: metaDefs?.find(m => m.key === key)?.name ?? key,
@@ -164,19 +201,23 @@ function valueView(ctx: Ctx, def: Pick<FieldDef, 'type' | 'options'> | undefined
   }
 }
 
-function fieldView(ctx: Ctx, rec: RecordDTO, def: FieldDef, custom: boolean, shared = false): FieldView {
+function fieldView(ctx: Ctx, rec: RecordDTO, def: FieldDef, custom: boolean, shared = false, quick = false): FieldView {
   const key = shared ? SHARED_PREFIX + def.key : custom ? CUSTOM_PREFIX + def.key : def.key
   const values = valuesOf(rec, key).map(v => valueView(ctx, def, def.meta, v))
   const shown = (def.multiple ? values : values.slice(0, 1)).map(v => v.text)
+  const occupied = !!rec.fields[key]?.hidden
+  const empty = values.length === 0 && !occupied
   return {
     key, name: def.name, def, custom: custom || shared, shared, values, shown,
-    empty: values.length === 0,
-    hidden: def.show === 'filled' && values.length === 0,
+    empty,
+    hidden: def.show === 'filled' && empty,
+    occupied,
+    quick,
   }
 }
 
 function period(ctx: Ctx, from: PartialDate | null, to: PartialDate | null): string {
-  return [formatDate(from, ctx.words.dates), formatDate(to, ctx.words.dates)].filter(Boolean).join(' — ')
+  return [formatDate(from, ctx.words.dates, ctx.dateView), formatDate(to, ctx.words.dates, ctx.dateView)].filter(Boolean).join(' — ')
 }
 
 function participantView(ctx: Ctx, container: RecordDTO, p: RecordDTO['participants'][number]): ParticipantView {
@@ -192,10 +233,10 @@ function participantView(ctx: Ctx, container: RecordDTO, p: RecordDTO['participa
 }
 
 /** Порядок связей (Д-27): по start записи-связи, без даты — в конце по времени создания (id — UUIDv7). */
-function relationOrder(a: RecordDTO, b: RecordDTO): number {
-  const ka = a.start?.value && !isEmptyDate(a.start.value) ? sortKey(a.start.value) : '￿'
-  const kb = b.start?.value && !isEmptyDate(b.start.value) ? sortKey(b.start.value) : '￿'
-  if (ka !== kb) return ka < kb ? -1 : 1
+function relationOrder(ctx: Ctx, a: RecordDTO, b: RecordDTO): number {
+  const ka = a.start?.value && !isEmptyDate(a.start.value) ? sortKey(a.start.value, ctx.eras) : '￿'
+  const kb = b.start?.value && !isEmptyDate(b.start.value) ? sortKey(b.start.value, ctx.eras) : '￿'
+  if (ka !== kb) return compareKeys(ka, kb)
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
@@ -210,11 +251,13 @@ function hasEnd(p: RecordDTO['end']): boolean {
 
 /**
  * Дата наступила (F-98): прошла её верхняя граница (2025 — после конца 2025).
- * Без года наступление не установить — не наступила.
+ * Без года наступление не установить — не наступила. Сравнение — по месту
+ * эры и году (F-143); «сегодня» — год мира без дня: до его начала.
  */
 function passed(ctx: Ctx, d: PartialDate | null | undefined): boolean {
-  const h = hi(d)
-  return h != null && h < ctx.today
+  const h = hiKey(d, ctx.eras)
+  const today = loKey(ctx.today, ctx.eras)
+  return h != null && today != null && compareKeys(h, today) < 0
 }
 
 /**
@@ -250,30 +293,48 @@ export function cardView(ctx: Ctx, rec: RecordDTO): CardView {
     const p = rec[key]
     dates.push({
       key, label: l, value: p?.value ?? null,
-      text: formatDate(p?.value, ctx.words.dates),
+      text: formatDate(p?.value, ctx.words.dates, ctx.dateView),
       link: p?.link ? { id: p.link, title: recordTitleById(ctx, p.link) } : null,
       hidden: periodHiddenWhenEmpty(ctx.reg, tpl, key) && isEmptyDate(p?.value) && !p?.link,
+      quick: !!tpl?.quick_fields?.includes(key),
     })
   }
 
-  // разделы: поля шаблона, общие свои поля шаблона (F-96), затем свободные поля записи (F-61, F-75)
+  // разделы: поля шаблона, общие свои поля шаблона (F-96), затем свободные поля записи (F-61, F-75);
+  // своё поле — в любом блоке (F-139), блок которого нет — в «Свои поля»
+  const choices = sectionChoices(ctx, rec)
+  const sharedKeys = new Set((tpl?.custom_sections ?? []).map(s => s.key))
   const sections = new Map<string, SectionView>()
-  const put = (fv: FieldView, section: string) => {
-    let s = sections.get(section)
+  const section = (key: string) => {
+    let s = sections.get(key)
     if (!s) {
-      s = { key: section, name: ctx.words.sections[section] ?? section, fields: [], addable: [] }
-      sections.set(section, s)
+      const c = choices.find(x => x.key === key)
+      const def = c && (sharedKeys.has(key) || c.own) ? { key, name: c.name } : undefined
+      s = { key, name: c?.name ?? ctx.words.sections[key] ?? key, fields: [], addable: [], ...(def ? { custom: { def, shared: !c!.own } } : {}) }
+      sections.set(key, s)
     }
+    return s
+  }
+  const put = (fv: FieldView, key: string) => {
+    const s = section(fv.custom && !choices.some(c => c.key === key) ? CUSTOM_SECTION : key)
     ;(fv.hidden ? s.addable : s.fields).push(fv)
   }
   let endFlag: FieldView | null = null
   for (const def of tpl?.fields ?? []) {
-    const fv = fieldView(ctx, rec, def, false)
+    // quick_fields шаблона — уже с переопределением дашборда (overrides, F-124)
+    const fv = fieldView(ctx, rec, def, false, false, !!tpl?.quick_fields?.includes(def.key))
     if (tpl?.end_flag && def.key === tpl.end_flag) endFlag = fv
     else put(fv, def.section ?? MAIN_SECTION)
   }
-  for (const def of tpl?.custom_fields ?? []) put(fieldView(ctx, rec, def, true, true), def.section ?? CUSTOM_SECTION)
-  for (const def of rec.custom_fields) put(fieldView(ctx, rec, def, true), def.section ?? CUSTOM_SECTION)
+  for (const def of tpl?.custom_fields ?? []) put(fieldView(ctx, rec, def, true, true), def.section || CUSTOM_SECTION)
+  for (const def of rec.custom_fields) put(fieldView(ctx, rec, def, true), def.section || CUSTOM_SECTION)
+  // свои блоки — и пустые (их видно в правке); порядок — блоки шаблона, затем свои
+  for (const c of choices) if (sharedKeys.has(c.key) || c.own) section(c.key)
+  const rank = (key: string) => {
+    const i = choices.findIndex(c => c.key === key)
+    return i < 0 ? choices.length : i
+  }
+  const ordered = [...sections.values()].sort((a, b) => rank(a.key) - rank(b.key))
 
   const photo = photoOf(ctx, rec)
 
@@ -331,10 +392,10 @@ export function cardView(ctx: Ctx, rec: RecordDTO): CardView {
   // `links` (события) и записи из полей-ссылок; внутри группы — Д-27.
   // Отношения — по весу шаблона (F-103), при равном — Д-27; прошлые
   // отделяются фильтром и сохраняют этот порядок.
-  const byOrder = <T>(list: [RecordDTO, T][]) => list.sort(([a], [b]) => relationOrder(a, b))
+  const byOrder = <T>(list: [RecordDTO, T][]) => list.sort(([a], [b]) => relationOrder(ctx, a, b))
   const peopleOf = containers
     .filter(([c]) => showsLinks(ctx.reg, tplOf(ctx, c)))
-    .sort(([a], [b]) => rankOrder(linksRank(tplOf(ctx, a)), linksRank(tplOf(ctx, b))) || relationOrder(a, b))
+    .sort(([a], [b]) => rankOrder(linksRank(tplOf(ctx, a)), linksRank(tplOf(ctx, b))) || relationOrder(ctx, a, b))
   const direct: [RecordDTO, RelationView][] = containers
     .filter(([c]) => !showsLinks(ctx.reg, tplOf(ctx, c)))
     .map(cp => [cp[0], relationView(cp)])
@@ -373,7 +434,7 @@ export function cardView(ctx: Ctx, rec: RecordDTO): CardView {
     photo,
     dates,
     endFlag,
-    sections: [...sections.values()],
+    sections: ordered,
     stage,
     roles,
     relations,

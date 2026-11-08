@@ -115,7 +115,7 @@ test('основной сценарий 0.1', async ({ page }) => {
     const born = page.locator('.sys-row').filter({ hasText: 'Дата рождения' })
     await partialDate(born, { d: '12', m: '3' })
     await born.getByRole('textbox', { name: 'Год' }).focus()
-    await born.getByRole('textbox', { name: 'Год' }).press('Tab')
+    await page.getByRole('button', { name: 'Готово' }).focus()
     await expect(born.locator('.cell')).toHaveAttribute('data-state', 'saved')
 
     // «Умер» (F-126) — в шапке за «Добавить дату»; «да/нет» — сегменты в один клик, повторный клик очищает
@@ -560,7 +560,7 @@ test('основной сценарий 0.1', async ({ page }) => {
     await expect(person).toHaveAttribute('data-state', 'saved')
     await expect(settings.getByRole('alert')).toBeHidden()
     await settings.getByRole('tab', { name: 'Доступ' }).click()
-    await expect(settings.getByText('Скоро')).toBeVisible()
+    await expect(settings.getByRole('heading', { name: 'Доступ по группам' })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('combobox', { name: 'Дашборд' }).locator('option').first()).toHaveText('Основной')
     await page.getByRole('button', { name: 'Новый дашборд' }).click()
@@ -581,7 +581,7 @@ test('основной сценарий 0.1', async ({ page }) => {
     await page.getByLabel('Текущий пароль').fill(PASSWORD)
     await page.getByLabel('Новый пароль').fill(NEW_PASSWORD)
     await page.getByLabel('Пароль ещё раз').fill(NEW_PASSWORD)
-    await page.getByRole('button', { name: 'Сохранить' }).click()
+    await page.locator('form').filter({ has: page.getByLabel('Текущий пароль') }).getByRole('button', { name: 'Сохранить' }).click()
     await expect(page.getByRole('status')).toContainText('Пароль изменён')
   })
 

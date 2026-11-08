@@ -1,5 +1,5 @@
 import type { Pinia } from 'pinia'
-import { createRouter, createWebHashHistory, createWebHistory, type Router, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type Router, type RouteRecordRaw } from 'vue-router'
 
 import { useSessionStore } from './stores/session'
 import AccountView from './views/AccountView.vue'
@@ -10,6 +10,7 @@ import HomeView from './views/HomeView.vue'
 import LoginView from './views/LoginView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import RecordView from './views/RecordView.vue'
+import RegisterView from './views/RegisterView.vue'
 import SetupView from './views/SetupView.vue'
 import TrashView from './views/TrashView.vue'
 
@@ -24,6 +25,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/setup', name: 'setup', component: SetupView, meta: { guest: true, bare: true } },
   { path: '/login', name: 'login', component: LoginView, meta: { guest: true, bare: true } },
+  { path: '/register', name: 'register', component: RegisterView, meta: { guest: true, bare: true } },
   { path: '/account', name: 'account', component: AccountView },
   { path: '/d/:d', name: 'dashboard', component: DashboardView, props: true },
   { path: '/d/:d/groups', name: 'groups', component: GroupsView, props: true },
@@ -53,6 +55,11 @@ export function guard(router: Router, pinia: Pinia): void {
       if (session.checked && !session.setupNeeded) return { name: 'login' }
       return true
     }
+    if (to.name === 'register') {
+      if (signedIn) return { name: 'home' }
+      if (session.setupNeeded) return { name: 'setup' }
+      return true
+    }
     if (to.name === 'login') {
       if (signedIn) return { name: 'home' }
       if (session.setupNeeded) return { name: 'setup' }
@@ -66,6 +73,6 @@ export function guard(router: Router, pinia: Pinia): void {
 
 export const router = createRouter({
   // демо-сборка открывается с любого статического сервера: адрес — в #
-  history: import.meta.env.VITE_DEMO === '1' ? createWebHashHistory() : createWebHistory(),
+  history: createWebHistory(),
   routes,
 })

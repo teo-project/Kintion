@@ -35,7 +35,7 @@ SELECT * FROM entity WHERE dashboard_id = @dashboard_id AND id = ANY (@ids::uuid
 -- name: UpdateEntitySystem :one
 UPDATE entity
 SET start_date = $2, start_link = $3, end_date = $4, end_link = $5, note = $6,
-    title_manual = $7, sensitive = $8, custom_fields = $9, updated_at = now()
+    title_manual = $7, sensitive = $8, custom_fields = $9, custom_sections = $10, updated_at = now()
 WHERE id = $1
 RETURNING *;
 

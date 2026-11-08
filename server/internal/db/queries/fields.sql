@@ -32,6 +32,22 @@ JOIN entity e ON e.id = fe.entity_id
 WHERE e.dashboard_id = $1 AND e.template_id = $2 AND starts_with(fe.field_key, @prefix::text)
 ORDER BY fe.field_key;
 
+-- Блоки, в которые записи шаблона в дашборде (в том числе в корзине) ставят
+-- свои поля (F-139): общий блок с полями не удаляется.
+-- name: ListCustomSectionsByTemplate :many
+SELECT DISTINCT (f->>'section')::text AS section
+FROM entity e, jsonb_array_elements(e.custom_fields) f
+WHERE e.dashboard_id = $1 AND e.template_id = $2 AND coalesce(f->>'section', '') <> ''
+ORDER BY 1;
+
+-- Ключи своих блоков записей шаблона в дашборде (в том числе в корзине):
+-- новый общий блок не занимает ключ блока записи (F-139).
+-- name: ListRecordSectionKeysByTemplate :many
+SELECT DISTINCT (s->>'key')::text AS key
+FROM entity e, jsonb_array_elements(e.custom_sections) s
+WHERE e.dashboard_id = $1 AND e.template_id = $2
+ORDER BY 1;
+
 -- Значения-строки поля записи (используемые варианты выбора) и пометка
 -- своего значения (F-104).
 -- name: ListFieldTextsByEntity :many

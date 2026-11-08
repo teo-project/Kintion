@@ -22,13 +22,14 @@ import EditCell from './EditCell.vue'
 import FieldValue from './FieldValue.vue'
 import HistoryPopover from './HistoryPopover.vue'
 import KinIcon from '../KinIcon.vue'
+import FileField from './FileField.vue'
 import ImageField from './ImageField.vue'
 import ValueEditor from './ValueEditor.vue'
 
 const props = defineProps<{ field: FieldView; dashboard: string; startEditing?: boolean }>()
 
 /** типы, которые правятся прямо в поле ввода (F-85) */
-const INLINE = new Set(['text', 'number', 'place', 'contact', 'phone', 'email', 'url', 'partial_date', 'choice', 'bool'])
+const INLINE = new Set(['text', 'number', 'place', 'contact', 'phone', 'email', 'url', 'partial_date', 'choice', 'bool', 'rich_text'])
 
 const s = useRecord()
 const editing = ref(false)
@@ -47,12 +48,14 @@ const shown = computed(() => {
   const ids = new Set(props.field.values.slice(0, multiple.value ? undefined : 1).map(v => v.id))
   return props.field.values.filter(v => ids.has(v.id)).map(v => ({ view: v, dto: raw.value.find(x => x.id === v.id) }))
 })
+/** поле занято скрытым от гостя значением (Q-50): только «Задано», без правки */
+const occupied = computed(() => !!props.field.occupied)
 /** режим редактирования карточки (или поле, открытое по месту) и поле ввода по типу */
-const inline = computed(() => (s.editing.value || single.value) && INLINE.has(props.field.def.type))
+const inline = computed(() => (s.editing.value || single.value) && INLINE.has(props.field.def.type) && !occupied.value)
 /** ссылка правится формой с выбором записи — в режиме редактирования или по месту */
-const canEdit = computed(() => (s.editing.value || s.inlineMode.value) && props.field.def.type === 'ref')
+const canEdit = computed(() => (s.editing.value || s.inlineMode.value) && props.field.def.type === 'ref' && !occupied.value)
 /** ручка правки по месту (F-108): поля ввода; ссылка — своей кнопкой, изображение — загрузкой */
-const handle = computed(() => s.inlineMode.value && INLINE.has(props.field.def.type))
+const handle = computed(() => s.inlineMode.value && INLINE.has(props.field.def.type) && !occupied.value)
 /** новое значение: у multiple — всегда можно добавить, иначе — пока значения нет */
 const canAdd = computed(() => multiple.value || raw.value.length === 0)
 const error = computed(() => localError.value || s.fieldErrors[props.field.key])
@@ -80,7 +83,7 @@ watch(() => s.inlineMode.value, v => {
 
 /** «По месту»: открыть ввод этого поля и поставить в него фокус */
 async function startSingle() {
-  if (!s.inlineMode.value) return
+  if (!s.inlineMode.value || occupied.value) return
   if (canEdit.value) return open()
   if (!INLINE.has(props.field.def.type)) return
   single.value = true
@@ -144,16 +147,16 @@ async function save() {
     return
   }
   for (const v of editable.value) {
-    if (!(v.id in drafts) || sameValue(drafts[v.id], storedRaw(v))) continue
+    if (!(v.id in drafts) || sameValue(drafts[v.id], storedRaw(v), props.field.def.type)) continue
     const d = drafts[v.id]
     const ok = isBlank(d)
       ? await s.save(key, rev => api.deleteValue(rec.id, key, v.id, rev))
-      : await s.save(key, rev => api.patchValue(rec.id, key, v.id, { if_rev: rev, ...valueIn(normalize(d), v.meta) }))
+      : await s.save(key, rev => api.patchValue(rec.id, key, v.id, { if_rev: rev, ...valueIn(normalize(d, props.field.def.type), v.meta) }))
     if (!ok) return finish()
   }
   if (canAdd.value && !isBlank(fresh.value)) {
     const ok = await s.save(key, rev => api.addValue(rec.id, key, {
-      if_rev: rev, ...valueIn(normalize(fresh.value)), position: multiple.value ? 'bottom' : 'top',
+      if_rev: rev, ...valueIn(normalize(fresh.value, props.field.def.type)), position: multiple.value ? 'bottom' : 'top',
     }))
     if (!ok) return finish()
   }
@@ -301,33 +304,47 @@ async function remove(v: ValueDTO) {
           :dashboard="dashboard"
         />
         <span
-          v-if="field.empty"
+          v-if="field.occupied"
+          class="kin-muted"
+          :title="t.card.occupiedHint"
+        >{{ t.card.occupied }}</span>
+        <span
+          v-else-if="field.empty"
           class="kin-muted"
         >{{ t.common.empty }}</span>
       </span>
     </template>
     <!-- инструменты — общие для чтения и ввода: история не пропадает, когда
-         поле по месту закрывается от клика по ней (F-108) -->
+         поле по месту закрывается от клика по ней (F-108). Пока поле открыто
+         формой или по месту, иконки скрыты, но место за ними остаётся: ширина
+         колонки иконок блока не скачет (interface-style.md, «Поля формы одной
+         ширины») -->
     <span
-      v-if="!editing"
       class="tools"
+      :class="{ 'tools--off': editing }"
     >
+      <button
+        v-if="handle"
+        class="kin-icon-btn kin-semi handle"
+        :class="{ 'tool--off': single }"
+        type="button"
+        :aria-label="`${t.common.edit}: ${field.name}`"
+        :title="t.common.edit"
+        @click="startSingle"
+      >
+        <KinIcon name="edit" />
+      </button>
       <template v-if="!inline">
         <ImageField
-          v-if="field.def.type === 'image' && (s.editing.value || s.inlineMode.value)"
+          v-if="field.def.type === 'image' && (s.editing.value || s.inlineMode.value) && !occupied"
           :field="field"
           :dashboard="dashboard"
         />
-        <button
-          v-if="handle"
-          class="kin-icon-btn kin-semi handle"
-          type="button"
-          :aria-label="`${t.common.edit}: ${field.name}`"
-          :title="t.common.edit"
-          @click="startSingle"
-        >
-          <KinIcon name="edit" />
-        </button>
+        <FileField
+          v-if="field.def.type === 'file' && (s.editing.value || s.inlineMode.value) && !occupied"
+          :field="field"
+          :dashboard="dashboard"
+        />
         <button
           v-if="canEdit"
           class="kin-icon-btn kin-semi"
@@ -340,7 +357,7 @@ async function remove(v: ValueDTO) {
         </button>
       </template>
       <HistoryPopover
-        v-if="!field.empty && !s.draft.value"
+        v-if="!field.empty && !occupied && !s.draft.value"
         :field-key="field.key"
         :label="field.name"
         :def="field.def"
@@ -404,6 +421,11 @@ async function remove(v: ValueDTO) {
   display: inline-flex;
   gap: 2px;
   align-self: center;
+}
+
+.tools--off,
+.tool--off {
+  visibility: hidden;
 }
 
 @media (max-width: 560px) {

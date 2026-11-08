@@ -21,12 +21,18 @@ export function isInvalid(def: Pick<FieldDef, 'type'>, v: unknown): boolean {
   return false
 }
 
-/** Значение для API: строки (и своё значение выбора) — без крайних пробелов. */
-export function normalize(v: unknown): unknown {
+/**
+ * Значение для API: строки (и своё значение выбора) — без крайних пробелов.
+ * Форматированный текст (F-141) — как есть, кроме пустых строк в начале и
+ * пробелов в конце: отступ первой строки — разметка Markdown (блок кода).
+ */
+export function normalize(v: unknown, type?: FieldDef['type']): unknown {
   if (isFreeText(v)) return { free: v.free.trim() }
-  return typeof v === 'string' ? v.trim() : v
+  if (typeof v !== 'string') return v
+  if (type === 'rich_text') return v.replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd()
+  return v.trim()
 }
 
-export function sameValue(a: unknown, b: unknown): boolean {
-  return JSON.stringify(normalize(a) ?? null) === JSON.stringify(normalize(b) ?? null)
+export function sameValue(a: unknown, b: unknown, type?: FieldDef['type']): boolean {
+  return JSON.stringify(normalize(a, type) ?? null) === JSON.stringify(normalize(b, type) ?? null)
 }

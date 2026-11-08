@@ -44,6 +44,8 @@ type Deps struct {
 	Files *files.Store
 	// Licenses — тексты лицензий сторонних библиотек (F-91), только вошедшим.
 	Licenses []byte
+	// Registration — режим регистрации (F-28): open, invite, closed.
+	Registration string
 }
 
 // API — обработчик /api/*.
@@ -69,6 +71,7 @@ func New(d Deps) *API {
 	a.groupRoutes()
 	a.fileRoutes()
 	a.auditRoutes()
+	a.sharingRoutes()
 	a.mux.HandleFunc("GET /api/licenses", a.licenses)
 	a.mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "нет такого метода API")
@@ -78,7 +81,7 @@ func New(d Deps) *API {
 
 // public — запросы без сессии: настройка и вход.
 func public(r *http.Request) bool {
-	return r.URL.Path == "/api/setup" || r.URL.Path == "/api/login"
+	return r.URL.Path == "/api/setup" || r.URL.Path == "/api/login" || r.URL.Path == "/api/register"
 }
 
 // licenses — тексты лицензий сторонних библиотек (F-91). Сессию уже проверил

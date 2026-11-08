@@ -4,15 +4,20 @@
 // запросом с версией записи; общее поле шаблона («добавить всем записям
 // этого шаблона») — список шаблона в дашборде с версией шаблона (F-45).
 // Тип поля со значениями не меняется и такое поле не убирается — сервер тоже
-// отказывает.
+// отказывает. Блок поля (F-139) — любой блок карточки или новый свой блок
+// с названием: у поля записи — блок записи (тем же запросом), у общего —
+// общий блок шаблона; блоки записи общему полю недоступны.
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import { api } from '@/api/client'
+import { CUSTOM_SECTION, sectionChoices } from '@/core/card'
 import { CUSTOM_PREFIX, FREE_META, SHARED_PREFIX } from '@/core/resolver'
-import type { FieldDef } from '@/core/types'
+import type { CustomSectionDef, FieldDef } from '@/core/types'
 import { fmt, t } from '@/i18n'
-import { CUSTOM_KINDS, customDef, customKey, fromKind, kindOf, withCustom, type CustomDraft, type CustomKind } from '@/ui/customFields'
+import {
+  CUSTOM_KINDS, customDef, customKey, fromKind, kindOf, sectionKey, withCustom, type CustomDraft, type CustomKind,
+} from '@/ui/customFields'
 import { SHARED_REV, useRecord } from '@/ui/record'
 import KinCheckbox from '../KinCheckbox.vue'
 import KinIcon from '../KinIcon.vue'
@@ -33,7 +38,11 @@ const s = useRecord()
 const open = ref(false)
 const draft = reactive<Required<CustomDraft>>({
   name: '', type: 'text', free: false, history: false, multiple: false, options: '', entity: '', cropName: t.photo.crop,
+  section: CUSTOM_SECTION,
 })
+/** выбор «новый блок» в списке блоков и его название (F-139) */
+const NEW_SECTION = ':new'
+const sectionName = ref('')
 /** новое поле — всем записям шаблона (F-96), по умолчанию — только этой */
 const toAll = ref(false)
 
@@ -73,6 +82,15 @@ const entities = computed(() => [...(s.reg.value?.entities.values() ?? [])].map(
 const sharedMode = computed(() => props.shared || (!props.def && toAll.value))
 const errKey = computed(() => (sharedMode.value ? SHARED_REV : REV))
 const sharedTitle = computed(() => fmt(t.custom.shared, { name: tplDef.value?.name ?? '' }))
+/** блоки, куда можно поставить поле: у общего — без блоков записи */
+const sectionOptions = computed(() => {
+  const ctx = s.ctx.value
+  const rec = s.rec.value
+  return ctx && rec ? sectionChoices(ctx, rec).filter(c => !(sharedMode.value && c.own)) : []
+})
+watch(sharedMode, () => {
+  if (draft.section !== NEW_SECTION && !sectionOptions.value.some(c => c.key === draft.section)) draft.section = CUSTOM_SECTION
+})
 
 function onOpen(v: boolean) {
   open.value = v
@@ -86,10 +104,20 @@ function onOpen(v: boolean) {
   draft.multiple = !!props.def?.multiple
   draft.options = (props.def?.options ?? []).map(o => o.name).join('\n')
   draft.entity = props.def?.entities?.[0] ?? ''
+  draft.section = props.def?.section || CUSTOM_SECTION
+  sectionName.value = ''
   toAll.value = false
 }
 
-const canSave = computed(() => !!draft.name.trim() && (draft.type !== 'choice' || !!draft.options.trim()))
+/** Новый блок, если выбран: ключ не совпадает с имеющимися блоками. */
+function newSection(own: CustomSectionDef[]): CustomSectionDef | null {
+  if (draft.section !== NEW_SECTION) return null
+  const taken = [...sectionOptions.value.map(c => c.key), ...own.map(x => x.key)]
+  return { key: sectionKey(sectionName.value, taken), name: sectionName.value.trim() }
+}
+
+const canSave = computed(() => !!draft.name.trim() && (draft.type !== 'choice' || !!draft.options.trim())
+  && (draft.section !== NEW_SECTION || !!sectionName.value.trim()))
 
 async function save(remove = false) {
   const rec = s.rec.value
@@ -97,7 +125,10 @@ async function save(remove = false) {
   if (sharedMode.value) {
     const list = tplDef.value?.custom_fields ?? []
     const key = props.def?.key ?? customKey(draft.name, list.map(f => f.key))
-    const ok = await s.saveShared(withCustom(list, key, remove ? null : customDef(key, draft, props.def)))
+    const own = tplDef.value?.custom_sections ?? []
+    const sec = remove ? null : newSection(own)
+    const def = customDef(key, { ...draft, section: sec?.key ?? draft.section }, props.def)
+    const ok = await s.saveShared(withCustom(list, key, remove ? null : def), sec ? [...own, sec] : undefined)
     if (!ok) return
     open.value = false
     if (!props.def) emit('added', SHARED_PREFIX + key)
@@ -105,8 +136,12 @@ async function save(remove = false) {
   }
   const list = rec.custom_fields
   const key = props.def?.key ?? customKey(draft.name, list.map(f => f.key))
-  const next = withCustom(list, key, remove ? null : customDef(key, draft, props.def))
-  const ok = await s.save(REV, rev => api.patchRecord(rec.id, { if_rev: rev, custom_fields: next }))
+  const own = rec.custom_sections ?? []
+  const sec = remove ? null : newSection(own)
+  const next = withCustom(list, key, remove ? null : customDef(key, { ...draft, section: sec?.key ?? draft.section }, props.def))
+  const ok = await s.save(REV, rev => api.patchRecord(rec.id, {
+    if_rev: rev, custom_fields: next, ...(sec ? { custom_sections: [...own, sec] } : {}),
+  }))
   if (!ok) return
   open.value = false
   if (!props.def) emit('added', CUSTOM_PREFIX + key)
@@ -212,6 +247,38 @@ async function save(remove = false) {
                 {{ e.name }}
               </option>
             </select>
+          </label>
+          <label class="kin-label">
+            {{ t.custom.section }}
+            <select
+              v-model="draft.section"
+              class="kin-input"
+              name="custom-section"
+            >
+              <option
+                v-for="c in sectionOptions"
+                :key="c.key"
+                :value="c.key"
+              >
+                {{ c.name }}
+              </option>
+              <option :value="NEW_SECTION">
+                {{ t.custom.newSection }}
+              </option>
+            </select>
+          </label>
+          <label
+            v-if="draft.section === NEW_SECTION"
+            class="kin-label"
+          >
+            {{ t.custom.sectionName }}
+            <input
+              v-model="sectionName"
+              class="kin-input"
+              name="custom-section-name"
+              required
+              maxlength="200"
+            >
           </label>
           <KinCheckbox
             v-model="draft.history"

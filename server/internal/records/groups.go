@@ -33,6 +33,9 @@ type GroupDTO struct {
 	// AutoSurname и Surnames — автодобавление записей по фамилии (F-122)
 	AutoSurname bool     `json:"auto_surname"`
 	Surnames    []string `json:"surnames"`
+	// Editable — смотрящий может ставить и снимать метку группы (гость — только
+	// на группах с правкой, F-148)
+	Editable bool `json:"editable"`
 }
 
 // NewGroup — POST /api/dashboards/{d}/groups (по умолчанию — в конец списка).
@@ -164,6 +167,9 @@ func groupName(s string) (string, error) {
 
 // Group — группа дашборда по id.
 func (t *Tx) Group(id uuid.UUID) (sqlc.Grp, error) {
+	if !t.GroupVisible(id) {
+		return sqlc.Grp{}, ErrNotFound
+	}
 	g, err := t.q.GetGroup(t.ctx, sqlc.GetGroupParams{DashboardID: t.Dashboard, ID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return g, ErrNotFound
@@ -171,23 +177,21 @@ func (t *Tx) Group(id uuid.UUID) (sqlc.Grp, error) {
 	return g, err
 }
 
-// Groups — все группы дашборда плоским списком (F-105), порядок — ручной.
+// Groups — видимые группы дашборда плоским списком (F-105), порядок — ручной.
+// Гостю — группы с выдачей и вложенные, счётчики — по видимым записям (F-07).
 func (t *Tx) Groups() ([]GroupDTO, error) {
-	rows, err := t.q.ListGroups(t.ctx, t.Dashboard)
+	all, err := t.q.ListGroups(t.ctx, t.Dashboard)
 	if err != nil {
 		return nil, err
 	}
-	counts, err := t.q.CountGroupLabels(t.ctx, t.Dashboard)
-	if err != nil {
-		return nil, err
-	}
+	rows := slices.DeleteFunc(all, func(g sqlc.Grp) bool { return !t.GroupVisible(g.ID) })
 	links, err := t.q.ListGroupLinks(t.ctx, t.Dashboard)
 	if err != nil {
 		return nil, err
 	}
-	n := map[uuid.UUID]int64{}
-	for _, c := range counts {
-		n[c.GroupID] = c.N
+	n, err := t.groupCounts()
+	if err != nil {
+		return nil, err
 	}
 	order := make(map[uuid.UUID]int, len(rows))
 	for i, g := range rows {
@@ -213,9 +217,28 @@ func (t *Tx) Groups() ([]GroupDTO, error) {
 	for _, g := range rows {
 		out = append(out, GroupDTO{ID: g.ID, Name: g.Name, Count: n[g.ID],
 			Parents: visible(parents[g.ID]), Children: visible(children[g.ID]),
-			AutoSurname: g.AutoSurname, Surnames: g.Surnames})
+			AutoSurname: g.AutoSurname, Surnames: g.Surnames, Editable: t.GroupEditable(g.ID)})
 	}
 	return out, nil
+}
+
+// groupCounts — число видимых записей в каждой группе (метка прямо на группе).
+func (t *Tx) groupCounts() (map[uuid.UUID]int64, error) {
+	n := map[uuid.UUID]int64{}
+	if !t.Guest() {
+		counts, err := t.q.CountGroupLabels(t.ctx, t.Dashboard)
+		for _, c := range counts {
+			n[c.GroupID] = c.N
+		}
+		return n, err
+	}
+	labels, err := t.q.ListLiveGroupLabels(t.ctx, t.Dashboard)
+	for _, l := range labels {
+		if t.inScope(l.EntityID) {
+			n[l.GroupID]++
+		}
+	}
+	return n, err
 }
 
 // GroupOut — группа для ответа.
@@ -427,6 +450,15 @@ func (t *Tx) PatchGroup(old sqlc.Grp, in PatchGroup) (sqlc.Grp, error) {
 // вложенности разрываются — вложенные группы к её родителям не переходят
 // (F-105); записи не удаляются.
 func (t *Tx) DeleteGroup(g sqlc.Grp) error {
+	// техническую группу гостя не удалить, пока он в дашборде: право правки
+	// на неё — его право создавать записи (F-149)
+	if g.CreatedFor != nil {
+		if _, err := t.q.GetMember(t.ctx, sqlc.GetMemberParams{DashboardID: t.Dashboard, AccountID: *g.CreatedFor}); err == nil {
+			return invalid(keyName, "группа созданного гостем: её нельзя удалить, пока гость в дашборде")
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+	}
 	labels, err := t.q.ListLabelsByGroup(t.ctx, g.ID)
 	if err != nil {
 		return err
@@ -453,10 +485,29 @@ func (t *Tx) DeleteGroup(g sqlc.Grp) error {
 			}
 		}
 	}
+	// права гостей на группу уходят вместе с ней (каскад) — в журнал (F-16)
+	grants, err := t.q.ListGroupGrants(t.ctx, g.ID)
+	if err != nil {
+		return err
+	}
+	for _, gr := range grants {
+		if err := t.audit(audit.Entry{Object: "grp_grant", ObjectID: &g.ID, Op: audit.OpDelete,
+			Before: grantSnap{AccountID: gr.AccountID, Nick: gr.Nick, GroupID: g.ID, CanEdit: gr.CanEdit}}); err != nil {
+			return err
+		}
+	}
 	if err := t.q.DeleteGroup(t.ctx, g.ID); err != nil {
 		return err
 	}
 	return t.auditGroup(audit.OpDelete, &g, nil)
+}
+
+// grantSnap — право гостя на группу в журнале (как в api: выдача и отзыв).
+type grantSnap struct {
+	AccountID uuid.UUID `json:"account_id"`
+	Nick      *string   `json:"nick"`
+	GroupID   uuid.UUID `json:"group_id"`
+	CanEdit   bool      `json:"can_edit"`
 }
 
 // SetGroups заменяет метки записи (версия groups — F-45).
@@ -596,11 +647,23 @@ func (t *Tx) actor() *uuid.UUID {
 // RecentGroups — последние уникальные группы, назначенные аккаунтом в
 // дашборде (F-81): по меткам «запись — группа», новые первыми.
 func (t *Tx) RecentGroups(account uuid.UUID, limit int32) ([]uuid.UUID, error) {
-	return t.q.RecentGroupsByAccount(t.ctx, sqlc.RecentGroupsByAccountParams{DashboardID: t.Dashboard, AccountID: account, Lim: limit})
+	lim := limit
+	if t.Guest() {
+		lim = math.MaxInt32 // гостю — сначала отбросить невидимые группы, потом обрезать (F-07)
+	}
+	ids, err := t.q.RecentGroupsByAccount(t.ctx, sqlc.RecentGroupsByAccountParams{DashboardID: t.Dashboard, AccountID: account, Lim: lim})
+	ids = slices.DeleteFunc(ids, func(id uuid.UUID) bool { return !t.GroupVisible(id) })
+	return ids[:min(len(ids), int(limit))], err
 }
 
 // setLabels приводит метки записи к want с журналом каждой метки.
 func (t *Tx) setLabels(entity uuid.UUID, want []uuid.UUID, field string) error {
+	if t.Guest() {
+		var err error
+		if want, err = t.guestLabels(entity, want, field); err != nil {
+			return err
+		}
+	}
 	all, err := t.q.ListGroups(t.ctx, t.Dashboard)
 	if err != nil {
 		return err
@@ -696,11 +759,18 @@ func (t *Tx) List(lq ListQuery) ([]*Rec, int64, error) {
 		pat := "%" + likeEscaper.Replace(q) + "%"
 		p.Pattern = &pat
 	}
+	if lq.Deleted && t.Guest() {
+		return []*Rec{}, 0, nil // корзина — только владельцу
+	}
 	page, err := t.q.ListRecords(t.ctx, p)
 	if err != nil {
 		return nil, 0, err
 	}
 	total := page.Total
+	if t.Guest() {
+		page.Ids = slices.DeleteFunc(page.Ids, func(id uuid.UUID) bool { return !t.inScope(id) })
+		total = int64(len(page.Ids))
+	}
 	ids, err := t.sortIDs(page.Ids)
 	if err != nil {
 		return nil, 0, err

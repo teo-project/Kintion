@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { ctxOf, ruSchema, type RecSpec } from '../__tests__/kit'
 import { family } from './__tests__/family'
-import { personView, treeInput } from './graph'
+import { coupleLabel, personView, treeInput } from './graph'
+import { jointLines, upLines } from './highlight'
 import { labelBox, labelLines, layoutTree, PERSON_W } from './layout'
 import type { TreeLayout, TreeNode } from './model'
 
@@ -107,6 +108,13 @@ describe('раскладка дерева', () => {
       const touching = h.edges.filter(e => e.source === d.id || e.target === d.id)
       expect(touching.length, d.id).toBeGreaterThanOrEqual(1)
     }
+    noOverlap(h)
+  })
+
+  it('«Скрыть умерших» не прячет того, на кого перешли по иконке дерева (F-136)', () => {
+    const dead = family().persons.find(p => p.dead)!
+    const h = layoutTree(family(), { depth: 10, hideDead: true, reveal: [dead.id] })
+    expect(people(h).map(n => n.person)).toContain(dead.id)
     noOverlap(h)
   })
 
@@ -242,7 +250,70 @@ describe('модель дерева из записей kin.core', () => {
     expect(input.persons.find(p => p.id === 'anna')!.dead).toBe(true)
   })
 
-  it('пара из трёх и более: каждый узел отношения открывает его карточку (Q-36)', () => {
+  it('даты разных эр: годы и порядок пар — по месту эры (F-143), без даты — после', () => {
+    const c = ctxOf(ruSchema(), [
+      person('a', 'male', { start: { y: 300, e: 'AC' } }), person('b', 'female', { start: { y: -5 } }),
+      person('x', 'male'), person('y', 'female'),
+      { id: 'late', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { y: 2, e: 'AC' }, parts: [['partner', 'a'], ['partner', 'b']] },
+      { id: 'early', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { y: 1000 }, parts: [['partner', 'x'], ['partner', 'y']] },
+      { id: 'none', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, parts: [['partner', 'x'], ['partner', 'b']] },
+    ])
+    const recs = Object.values(c.records).filter(r => r !== undefined)
+    const rels = recs.filter(r => r.entity !== 'kin.core.person')
+    const people = recs.filter(r => r.entity === 'kin.core.person')
+    const inp = treeInput(c, rels, people)
+    const order = (i: typeof inp, id: string) => i.couples.find(x => x.id === id)!.order
+    // по умолчанию наша эра раньше AC
+    expect(order(inp, 'early') < order(inp, 'late')).toBe(true)
+    expect(order(inp, 'late') < order(inp, 'none')).toBe(true)
+    expect(inp.persons.find(p => p.id === 'b')!.year! < inp.persons.find(p => p.id === 'a')!.year!).toBe(true)
+    const inp2 = treeInput({ ...c, eras: ['AC', ''] }, rels, people)
+    expect(order(inp2, 'late') < order(inp2, 'early')).toBe(true)
+    // человек другой эры вне дерева не меняет годы показанных
+    const one = ctxOf(ruSchema(), [
+      person('p', 'male', { start: { y: 1950 } }), person('q', 'female', { start: { y: 1955 } }),
+      person('far', 'male', { start: { y: 10, e: 'AC' } }),
+      { id: 'pq', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, parts: [['partner', 'p'], ['partner', 'q']] },
+    ])
+    const all1 = Object.values(one.records).filter(r => r !== undefined)
+    const inp3 = treeInput(one, all1.filter(r => r.entity !== 'kin.core.person'), all1.filter(r => r.entity === 'kin.core.person'))
+    expect(inp3.persons.map(p => [p.id, p.year])).toEqual([['p', 1950], ['q', 1955]])
+  })
+
+  it('подпись пары — с годами начала и конца (F-144), по виду эр (F-14)', () => {
+    const c = ctxOf(ruSchema(), [
+      person('a', 'male'), person('b', 'female'),
+      { id: 'both', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { y: 1938, m: 5 }, end: { y: 1945 }, parts: [['partner', 'a'], ['partner', 'b']] },
+      { id: 'from', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { y: 1938 }, parts: [['partner', 'a'], ['partner', 'b']] },
+      { id: 'to', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, end: { y: 1945 }, parts: [['partner', 'a'], ['partner', 'b']] },
+      { id: 'none', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { m: 3, d: 12 }, parts: [['partner', 'a'], ['partner', 'b']] },
+      { id: 'era', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { y: -20, e: 'AC' }, end: { e: 'Мезозой' }, parts: [['partner', 'a'], ['partner', 'b']] },
+    ])
+    expect(coupleLabel(c, c.records.both!)).toBe('Брак 1938 – 1945')
+    expect(coupleLabel(c, c.records.from!)).toBe('Брак 1938')
+    expect(coupleLabel(c, c.records.to!)).toBe('Брак – 1945')
+    // без года — без лет
+    expect(coupleLabel(c, c.records.none!)).toBe('Брак')
+    // эра скрыта: отрицательный — «до н. э.»; дата из одной эры — эра
+    expect(coupleLabel(c, c.records.era!)).toBe('Брак 20 до н. э. – Мезозой')
+    expect(coupleLabel({ ...c, dateView: { showEra: true } }, c.records.era!)).toBe('Брак 20 до AC – Мезозой')
+    const recs = Object.values(c.records).filter(r => r !== undefined)
+    const inp = treeInput(c, recs.filter(r => r.entity !== 'kin.core.person'), recs.filter(r => r.entity === 'kin.core.person'))
+    expect(inp.couples.find(x => x.id === 'both')!.label).toBe('Брак 1938 – 1945')
+    // пара из трёх — годы у каждого узла; дата из одной эры — в порядке по месту эры
+    const t = ctxOf(ruSchema(), [
+      person('a', 'male'), person('b', 'female'), person('c', 'female'),
+      { id: 'tri', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { y: 1950 }, parts: [['partner', 'a'], ['partner', 'b'], ['partner', 'c']] },
+      { id: 'ab', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, start: { e: 'Мезозой' }, parts: [['partner', 'a'], ['partner', 'b']] },
+    ])
+    const tr = Object.values(t.records).filter(r => r !== undefined)
+    const ti = treeInput({ ...t, eras: ['Мезозой', ''] }, tr.filter(r => r.entity !== 'kin.core.person'), tr.filter(r => r.entity === 'kin.core.person'))
+    expect(ti.couples.filter(x => x.relation === 'tri').map(x => x.label)).toEqual(['Брак 1950', 'Брак 1950'])
+    const ord = (id: string) => ti.couples.find(x => x.id === id)!.order
+    expect(ord('ab') < ord('tri')).toBe(true)
+  })
+
+  it('пара из трёх и более: одна плашка, открывает карточку отношения (Q-36, F-136)', () => {
     const c3 = ctxOf(ruSchema(), [
       person('a', 'male'), person('b', 'female'), person('c', 'female'),
       { id: 'tri', template: 'kin.core.relationship', fields: { stage: ['marriage'] }, parts: [['partner', 'a'], ['partner', 'b'], ['partner', 'c']] },
@@ -251,7 +322,7 @@ describe('модель дерева из записей kin.core', () => {
     const inp = treeInput(c3, recs.filter(r => r.entity !== 'kin.core.person'), recs.filter(r => r.entity === 'kin.core.person'))
     expect(inp.couples.map(c => [c.id, c.relation])).toEqual([['tri', 'tri'], ['tri:2', 'tri']])
     const unions = layoutTree(inp, { depth: 10 }).nodes.filter(n => n.type === 'union')
-    expect(unions.map(n => n.relation)).toEqual(['tri', 'tri'])
+    expect(unions.map(n => [n.id, n.relation])).toEqual([['tri', 'tri']])
   })
 
   it('ФИО в узле — полностью, с отчеством и вторым именем, если заполнены (F-123)', () => {
@@ -302,5 +373,105 @@ describe('завершённость записи (F-126)', () => {
     ])
     c.records.l!.end = { value: null, link: 'ev' } as never
     expect(personView(c, c.records.l!).dead).toBe(true)
+  })
+})
+
+describe('пара из трёх и более (F-136)', () => {
+  // как у Алиевых: a и трое b, c, d; у каждой пары свой ребёнок
+  const input = {
+    persons: ['a', 'b', 'c', 'd', 'kb', 'kc', 'kd'].map(id => ({ id, year: id.startsWith('k') ? 2010 : 1980 })),
+    couples: [
+      { id: 'r', relation: 'r', a: 'a', b: 'b', order: '1', label: 'Брак 2000' },
+      { id: 'r:2', relation: 'r', a: 'a', b: 'c', order: '1', label: 'Брак 2000' },
+      { id: 'r:3', relation: 'r', a: 'a', b: 'd', order: '1', label: 'Брак 2000' },
+    ],
+    descents: ['b', 'c', 'd'].flatMap(p => [
+      { id: `a-k${p}`, parent: 'a', child: `k${p}` },
+      { id: `${p}-k${p}`, parent: p, child: `k${p}` },
+    ]),
+    siblings: [],
+  }
+  const l = layoutTree(input, { depth: 10 })
+  const node = (id: string) => l.nodes.find(n => n.id === id)!
+  const lineTo = (p: string) => l.edges.find(e => e.type === 'straight' && ((e.source === 'r' && e.target === p) || (e.source === p && e.target === 'r')))!
+
+  it('одна плашка с подписью отношения; линии ко всем участникам', () => {
+    const unions = l.nodes.filter(n => n.type === 'union')
+    expect(unions.map(n => n.id)).toEqual(['r'])
+    expect(unions[0]).toMatchObject({ joint: true, label: 'Брак 2000' })
+    const straight = l.edges.filter(e => e.type === 'straight')
+    expect(straight).toHaveLength(4)
+    for (const p of ['a', 'b', 'c', 'd']) expect(lineTo(p)).toMatchObject({ rels: ['r'] })
+    noOverlap(l)
+  })
+
+  it('к дальним — дуги на разной высоте над плашкой, под карточками между ними', () => {
+    const r = node('r')
+    const arcs = l.edges.filter(e => e.arc)
+    expect(arcs).toHaveLength(2)
+    const ys = arcs.map(e => e.arc!.y)
+    expect(new Set(ys).size).toBe(2)
+    for (const e of arcs) {
+      expect(e.arc!.y).toBeLessThan(r.y)
+      expect(e.arc!.top).toBe(r.y)
+      expect(e.arc!.x).toBeGreaterThan(r.x)
+      expect(e.arc!.x).toBeLessThan(r.x + r.w)
+      // под каждой карточкой между плашкой и участником
+      const far = e.source === 'r' ? e.target : e.source
+      const [lo, hi] = [Math.min(node(far).x, r.x), Math.max(node(far).x, r.x)]
+      const between = l.nodes.filter(n => n.type === 'person' && n.row === r.row && n.id !== far && n.x > lo && n.x < hi).map(n => n.id).sort()
+      expect(e.under!.map(u => u.node).sort()).toEqual(between)
+      expect(between.length).toBeGreaterThan(0)
+    }
+    // дальше — выше; выходы из плашки разные
+    const [near, far] = [...arcs].sort((m, n) => (m.under!.length - n.under!.length))
+    expect(far!.arc!.y).toBeLessThan(near!.arc!.y)
+    expect(far!.arc!.x).not.toBe(near!.arc!.x)
+    // соседи — прямые
+    expect(l.edges.filter(e => e.type === 'straight' && !e.arc).every(e => !e.under)).toBe(true)
+  })
+
+  it('линии детей — от плашки, на одной горизонтали; зажигают линии к своим родителям', () => {
+    const buses = l.edges.filter(e => e.type === 'bus')
+    expect(buses.map(e => e.source)).toEqual(['r', 'r', 'r'])
+    expect(new Set(buses.map(e => e.busY)).size).toBe(1)
+    for (const p of ['b', 'c', 'd']) {
+      const bus = buses.find(e => e.target === `k${p}`)!
+      expect([...upLines(l, bus.id)].sort()).toEqual([bus.id, lineTo('a').id, lineTo(p).id].sort())
+    }
+  })
+
+  it('много участников: высоты и выходы дуг не совпадают', () => {
+    const ws = ['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+    const many = layoutTree({
+      persons: ['a', ...ws].map(id => ({ id, year: 1980 })),
+      couples: ws.map((w, i) => ({ id: i ? `r:${i + 1}` : 'r', relation: 'r', a: 'a', b: w, order: '1', label: 'Брак' })),
+      descents: [], siblings: [],
+    }, { depth: 10 })
+    const arcs = many.edges.filter(e => e.arc)
+    expect(arcs.length).toBeGreaterThan(5)
+    const top = Math.min(...many.nodes.filter(n => n.type === 'person').map(n => n.y))
+    expect(new Set(arcs.map(e => e.arc!.y)).size).toBe(arcs.length)
+    expect(new Set(arcs.map(e => e.arc!.x)).size).toBe(arcs.length)
+    for (const e of arcs) expect(e.arc!.y).toBeGreaterThan(top)
+  })
+
+  it('«Скрыть умерших» и срез глубины: плашка одна, линии детей — от неё', () => {
+    const dead = { ...input, persons: input.persons.map(p => (p.id === 'c' ? { ...p, dead: true } : p)) }
+    const hd = layoutTree(dead, { depth: 10, hideDead: true })
+    expect(hd.nodes.filter(n => n.type === 'union').map(n => n.id)).toEqual(['r'])
+    const unionIds = new Set(hd.nodes.filter(n => n.type === 'union' || (n.type === 'dot' && !n.person)).map(n => n.id))
+    for (const e of hd.edges.filter(x => x.type === 'bus')) expect(hd.nodes.some(n => n.id === e.source)).toBe(true)
+    expect(hd.edges.every(e => hd.nodes.some(n => n.id === e.source) && hd.nodes.some(n => n.id === e.target))).toBe(true)
+    expect(unionIds.size).toBeGreaterThan(0)
+    const top = layoutTree(input, { depth: 1 })
+    expect(top.nodes.filter(n => n.type === 'union')).toHaveLength(0)
+  })
+
+  it('наведение на плашку — все линии к участникам; у обычной пары — ничего', () => {
+    expect([...jointLines(l, 'r')].sort()).toEqual(['a', 'b', 'c', 'd'].map(p => lineTo(p).id).sort())
+    const fam = layoutTree(family(), { depth: 10 })
+    expect(jointLines(fam, 'u-sergei2').size).toBe(0)
+    expect(fam.nodes.some(n => n.joint)).toBe(false)
   })
 })

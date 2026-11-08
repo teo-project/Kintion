@@ -224,6 +224,8 @@ type SchemaDTO struct {
 	Language  string            `json:"language"`
 	Entities  []json.RawMessage `json:"entities"`
 	Templates []TemplateDTO     `json:"templates"`
+	// Eras — эры дашборда (F-143).
+	Eras ErasDTO `json:"eras"`
 }
 
 // Schema собирает реестр дашборда: только активные шаблоны, чья сущность загружена.
@@ -232,6 +234,11 @@ func Schema(ctx context.Context, q *sqlc.Queries, reg *packs.Registry, dashboard
 	for _, e := range reg.Entities() {
 		out.Entities = append(out.Entities, e.Raw)
 	}
+	eras, err := LoadEras(ctx, q, dashboard)
+	if err != nil {
+		return out, err
+	}
+	out.Eras = eras
 	rows, err := q.ListDashboardTemplates(ctx, dashboard)
 	if err != nil {
 		return out, err

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Настройки дашборда (F-132): сверху «Настройки / Шаблоны / Доступ». «Настройки» —
-// название; «Шаблоны» — остров на шаблон: поля быстрой формы (F-124) облаками плашек
+// название и эры (F-143, DashboardEras); «Шаблоны» — остров на шаблон: поля быстрой формы (F-124) облаками плашек
 // (включённые — в порядке формы, выключенные — ниже; клик переносит), переопределение
 // `quick_fields` шаблона в дашборде, пак — по умолчанию. Обязательные поля пака
 // (`required`) и роли с `min` ≥ 1 закреплены: убрать нельзя, поля — только порядок.
@@ -19,9 +19,12 @@ import { errorText, t } from '@/i18n'
 import { useDashboardsStore } from '@/stores/dashboards'
 import { makeCtx } from '@/ui/ctx'
 
+import DashboardAccess from './DashboardAccess.vue'
+import DashboardEras from './DashboardEras.vue'
 import KinIcon from './KinIcon.vue'
 
-const props = defineProps<{ dashboard: string; name: string }>()
+/** readonly — гость чужого дашборда (F-03): настройки только для просмотра, без «Доступа» */
+const props = defineProps<{ dashboard: string; name: string; readonly?: boolean }>()
 const open = defineModel<boolean>('open', { required: true })
 
 const dashboards = useDashboardsStore()
@@ -139,7 +142,8 @@ function move(tpl: SchemaTemplateDTO, addr: string, by: -1 | 1) {
   setChosen(tpl, sel)
 }
 
-/** Alt + ← / → двигает плашку в форме (для клавиатуры). */
+/** Alt + ← / → двигает плашку в форме — для клавиатуры (фокус по Tab; клик
+ * переносит плашку, поэтому в подсказке не упоминается, только aria-keyshortcuts). */
 function onKey(e: KeyboardEvent, tpl: SchemaTemplateDTO, addr: string) {
   if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
   e.preventDefault()
@@ -342,156 +346,168 @@ async function saveQuick(id: string, reset = false, list: string[] = []) {
               {{ t.dashboard.settingsTemplates }}
             </TabsTrigger>
             <TabsTrigger
+              v-if="!readonly"
               class="seg-item"
               value="access"
             >
               {{ t.dashboard.tabAccess }}
             </TabsTrigger>
           </TabsList>
+          <!-- прокручивает div: fieldset в мобильном Chrome не прокручивается -->
           <div class="body">
-            <TabsContent
-              value="settings"
-              class="pane"
+            <fieldset
+              class="fields"
+              :disabled="readonly"
             >
-              <section class="kin-island pane-island">
-                <h3 class="kin-section-title">
-                  {{ t.dashboard.settingsDashboard }}
-                </h3>
-                <form
-                  class="kin-row"
-                  @submit.prevent="renameDashboard"
-                >
-                  <input
-                    v-model="title"
-                    class="kin-input grow"
-                    name="dashboard-name"
-                    :aria-label="t.dashboard.newDashboardName"
-                    required
-                  >
-                  <button
-                    class="kin-ibtn kin-ibtn--primary"
-                    type="submit"
-                    :disabled="busy"
-                    :aria-label="t.common.save"
-                    :title="t.common.save"
-                  >
-                    <KinIcon name="check" />
-                  </button>
-                </form>
-              </section>
-            </TabsContent>
-            <TabsContent
-              value="templates"
-              class="pane"
-            >
-              <section
-                v-for="tpl in templates"
-                :key="tpl.id"
-                class="kin-island pane-island quick"
-                :class="quickState[tpl.id] && `quick--${quickState[tpl.id]}`"
-                :data-testid="`quick-${tpl.key}`"
-                :data-state="quickState[tpl.id] ?? 'idle'"
+              <TabsContent
+                value="settings"
+                class="pane"
               >
-                <div class="kin-row">
-                  <h3 class="kin-section-title grow">
-                    {{ tpl.definition.name }}
+                <section class="kin-island pane-island">
+                  <h3 class="kin-section-title">
+                    {{ t.dashboard.settingsDashboard }}
                   </h3>
-                  <button
-                    class="kin-btn kin-btn--small"
-                    type="button"
-                    :disabled="resetting(tpl)"
-                    @click="saveQuick(tpl.id, true)"
+                  <form
+                    class="kin-row"
+                    @submit.prevent="renameDashboard"
                   >
-                    {{ t.dashboard.quickReset }}
-                  </button>
-                </div>
-                <p class="kin-muted hint">
+                    <input
+                      v-model="title"
+                      class="kin-input grow"
+                      name="dashboard-name"
+                      :aria-label="t.dashboard.newDashboardName"
+                      required
+                    >
+                    <button
+                      class="kin-ibtn kin-ibtn--primary"
+                      type="submit"
+                      :disabled="busy"
+                      :aria-label="t.common.save"
+                      :title="t.common.save"
+                    >
+                      <KinIcon name="check" />
+                    </button>
+                  </form>
+                </section>
+                <DashboardEras :dashboard="dashboard" />
+              </TabsContent>
+              <TabsContent
+                value="templates"
+                class="pane"
+              >
+                <!-- подсказка — одна на все шаблоны -->
+                <p
+                  class="kin-muted hint"
+                  data-testid="quick-hint"
+                >
                   {{ t.dashboard.quickHint }}
                 </p>
-                <div class="kin-muted cloud-label">
-                  {{ t.dashboard.quickOn }}
-                </div>
-                <ul
-                  class="cloud cloud-on"
-                  :aria-label="t.dashboard.quickOn"
-                  @dragover.prevent
-                  @drop.prevent="onDrop(tpl, null, true)"
+                <section
+                  v-for="tpl in templates"
+                  :key="tpl.id"
+                  class="kin-island pane-island quick"
+                  :class="quickState[tpl.id] && `quick--${quickState[tpl.id]}`"
+                  :data-testid="`quick-${tpl.key}`"
+                  :data-state="quickState[tpl.id] ?? 'idle'"
                 >
-                  <li
-                    v-for="r in pinnedRoles(tpl)"
-                    :key="'role:' + r.key"
-                  >
-                    <span
-                      class="pill pinned"
-                      :title="t.dashboard.quickPinned"
+                  <div class="kin-row">
+                    <h3 class="kin-section-title grow">
+                      {{ tpl.definition.name }}
+                    </h3>
+                    <button
+                      class="kin-btn kin-btn--small"
+                      type="button"
+                      :disabled="resetting(tpl)"
+                      @click="saveQuick(tpl.id, true)"
                     >
-                      <KinIcon name="lock" />{{ r.label }}
-                    </span>
-                  </li>
-                  <li
-                    v-for="r in inForm(tpl)"
-                    :key="r.addr"
+                      {{ t.dashboard.quickReset }}
+                    </button>
+                  </div>
+                  <div class="kin-muted cloud-label">
+                    {{ t.dashboard.quickOn }}
+                  </div>
+                  <ul
+                    class="cloud cloud-on"
+                    :aria-label="t.dashboard.quickOn"
                     @dragover.prevent
-                    @drop.prevent.stop="onDrop(tpl, r.addr, true)"
+                    @drop.prevent="onDrop(tpl, null, true)"
                   >
-                    <button
-                      class="pill"
-                      :class="{ pinned: r.pinned }"
-                      type="button"
-                      draggable="true"
-                      aria-pressed="true"
-                      :aria-disabled="r.pinned || undefined"
-                      :title="r.pinned ? t.dashboard.quickPinned : t.dashboard.quickHint"
-                      @click="toggle(tpl, r.addr)"
-                      @keydown="e => onKey(e, tpl, r.addr)"
-                      @dragstart="e => onDragStart(e, tpl, r.addr)"
-                      @dragend="drag = null"
+                    <li
+                      v-for="r in pinnedRoles(tpl)"
+                      :key="'role:' + r.key"
                     >
-                      <KinIcon
-                        v-if="r.pinned"
-                        name="lock"
-                      />{{ r.label }}
-                    </button>
-                  </li>
-                </ul>
-                <div class="kin-muted cloud-label">
-                  {{ t.dashboard.quickOff }}
-                </div>
-                <ul
-                  class="cloud cloud-off"
-                  :aria-label="t.dashboard.quickOff"
-                  @dragover.prevent
-                  @drop.prevent="onDrop(tpl, null, false)"
-                >
-                  <li
-                    v-for="r in outForm(tpl)"
-                    :key="r.addr"
+                      <span
+                        class="pill pinned"
+                        :title="t.dashboard.quickPinned"
+                      >
+                        <KinIcon name="lock" />{{ r.label }}
+                      </span>
+                    </li>
+                    <li
+                      v-for="r in inForm(tpl)"
+                      :key="r.addr"
+                      @dragover.prevent
+                      @drop.prevent.stop="onDrop(tpl, r.addr, true)"
+                    >
+                      <button
+                        class="pill"
+                        :class="{ pinned: r.pinned }"
+                        type="button"
+                        draggable="true"
+                        aria-pressed="true"
+                        :aria-disabled="r.pinned || undefined"
+                        :title="r.pinned ? t.dashboard.quickPinned : undefined"
+                        aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
+                        @click="toggle(tpl, r.addr)"
+                        @keydown="e => onKey(e, tpl, r.addr)"
+                        @dragstart="e => onDragStart(e, tpl, r.addr)"
+                        @dragend="drag = null"
+                      >
+                        <KinIcon
+                          v-if="r.pinned"
+                          name="lock"
+                        />{{ r.label }}
+                      </button>
+                    </li>
+                  </ul>
+                  <div class="kin-muted cloud-label">
+                    {{ t.dashboard.quickOff }}
+                  </div>
+                  <ul
+                    class="cloud cloud-off"
+                    :aria-label="t.dashboard.quickOff"
+                    @dragover.prevent
+                    @drop.prevent="onDrop(tpl, null, false)"
                   >
-                    <button
-                      class="pill pill-off"
-                      type="button"
-                      draggable="true"
-                      aria-pressed="false"
-                      @click="toggle(tpl, r.addr)"
-                      @dragstart="e => onDragStart(e, tpl, r.addr)"
-                      @dragend="drag = null"
+                    <li
+                      v-for="r in outForm(tpl)"
+                      :key="r.addr"
                     >
-                      {{ r.label }}
-                    </button>
-                  </li>
-                </ul>
-              </section>
-            </TabsContent>
-            <TabsContent
-              value="access"
-              class="pane"
-            >
-              <section class="kin-island pane-island">
-                <p class="kin-muted soon">
-                  {{ t.dashboard.accessSoon }}
-                </p>
-              </section>
-            </TabsContent>
+                      <button
+                        class="pill pill-off"
+                        type="button"
+                        draggable="true"
+                        aria-pressed="false"
+                        @click="toggle(tpl, r.addr)"
+                        @dragstart="e => onDragStart(e, tpl, r.addr)"
+                        @dragend="drag = null"
+                      >
+                        {{ r.label }}
+                      </button>
+                    </li>
+                  </ul>
+                </section>
+              </TabsContent>
+              <TabsContent
+                value="access"
+                class="pane"
+              >
+                <DashboardAccess
+                  v-if="!readonly"
+                  :dashboard="dashboard"
+                />
+              </TabsContent>
+            </fieldset>
           </div>
         </TabsRoot>
         <p
@@ -536,6 +552,14 @@ async function saveQuick(id: string, reset = false, list: string[] = []) {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.fields {
+  /* fieldset: без рамки и отступов браузера */
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
 }
 
 .pane {
@@ -608,10 +632,6 @@ async function saveQuick(id: string, reset = false, list: string[] = []) {
 }
 
 .hint,
-.soon {
-  margin: 0;
-  font-size: var(--kin-font-tiny);
-}
 
 .cloud-label {
   font-size: var(--kin-font-tiny);

@@ -137,6 +137,7 @@ func (t *Tx) Purge(r *Rec) error {
 		nr, err := t.q.UpdateEntitySystem(t.ctx, sqlc.UpdateEntitySystemParams{
 			ID: row.ID, StartDate: row.StartDate, StartLink: row.StartLink, EndDate: row.EndDate, EndLink: row.EndLink,
 			Note: row.Note, TitleManual: row.TitleManual, Sensitive: row.Sensitive, CustomFields: row.CustomFields,
+			CustomSections: row.CustomSections,
 		})
 		if err != nil {
 			return err

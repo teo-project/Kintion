@@ -3,9 +3,10 @@
 // в операции — «запись · что · действие» и изменения «было → стало». Для
 // истории записи — фильтр entity; на странице журнала — фильтры по записи,
 // автору и действию. Окончательно удалённая запись — её последнее название
-// по журналу (F-94). Страницы — по курсору сервера.
+// по журналу (F-94). Страницы — по курсору сервера. Длинные значения
+// (форматированный текст, F-141) — начало и «Показать целиком».
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { api } from '@/api/client'
@@ -13,7 +14,7 @@ import type { AuditOperationDTO, GroupDTO, RelatedDTO } from '@/api/types'
 import { errorText, t } from '@/i18n'
 import { useDashboardsStore } from '@/stores/dashboards'
 import { useSessionStore } from '@/stores/session'
-import { auditCtx, operationView } from '@/ui/audit'
+import { auditCtx, clipText, operationView } from '@/ui/audit'
 import { makeCtx } from '@/ui/ctx'
 import type { Registry } from '@/core/registry'
 import KinIcon from './KinIcon.vue'
@@ -43,6 +44,9 @@ const actor = ref('')
 const op = ref('')
 const OPS = ['create', 'update', 'delete', 'restore', 'purge', 'move'] as const
 const opNames = t.audit.ops as Record<string, string | undefined>
+
+/** развёрнутые длинные значения: `<операция>/<строка>/<изменение>` */
+const expanded = reactive(new Set<string>())
 const actors = computed(() => [
   { value: '', name: t.audit.anyActor },
   ...(session.account ? [{ value: session.account.id, name: t.audit.actorMe }] : []),
@@ -246,16 +250,25 @@ function when(at: string): string {
                 :key="i"
               >
                 <span class="kin-muted">{{ c.label }}:</span>
-                <del v-if="c.before">{{ c.before }}</del>
+                <del v-if="c.before">{{ expanded.has(`${o.id}/${e.id}/${i}`) ? c.before : clipText(c.before) }}</del>
                 <span
                   v-if="c.before || c.after"
                   aria-hidden="true"
                 > → </span>
-                <ins v-if="c.after">{{ c.after }}</ins>
+                <ins v-if="c.after">{{ expanded.has(`${o.id}/${e.id}/${i}`) ? c.after : clipText(c.after) }}</ins>
                 <span
                   v-else-if="c.before"
                   class="kin-muted"
                 >{{ t.common.empty }}</span>
+                <button
+                  v-if="clipText(c.before) !== c.before || clipText(c.after) !== c.after"
+                  class="more"
+                  type="button"
+                  :aria-expanded="expanded.has(`${o.id}/${e.id}/${i}`)"
+                  @click="expanded.has(`${o.id}/${e.id}/${i}`) ? expanded.delete(`${o.id}/${e.id}/${i}`) : expanded.add(`${o.id}/${e.id}/${i}`)"
+                >
+                  {{ expanded.has(`${o.id}/${e.id}/${i}`) ? t.audit.less : t.audit.full }}
+                </button>
               </li>
             </ul>
           </li>
@@ -352,6 +365,21 @@ function when(at: string): string {
 
 del {
   color: var(--kin-color-text-muted);
+}
+
+del,
+ins {
+  white-space: pre-line;
+}
+
+.more {
+  margin-left: var(--kin-space-1);
+  padding: 0;
+  color: var(--kin-color-accent);
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 
 ins {

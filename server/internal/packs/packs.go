@@ -64,23 +64,29 @@ type Entity struct {
 // Типы полей формата v0 (pack-format.md, «Поле»). Это словарь формата, а не
 // ключи паков: часть названий совпадает с ключами полей kin.core случайно.
 const (
-	TypeText    = "text"
-	TypeNumber  = "number"
-	TypeDate    = "partial_date"
-	TypeBool    = "bool"
-	TypeChoice  = "choice"
-	TypeRef     = "ref"
-	TypeImage   = "image"
+	TypeText   = "text"
+	TypeNumber = "number"
+	TypeDate   = "partial_date"
+	TypeBool   = "bool"
+	TypeChoice = "choice"
+	TypeRef    = "ref"
+	TypeImage  = "image"
+	// TypeFile — любой файл (документ, скан): значение — sha256, имя, тип и
+	// размер — в meta значения (FileMeta).
+	TypeFile    = "file"
 	TypePlace   = "place"
 	TypePhone   = "phone"
 	TypeEmail   = "email"
 	TypeURL     = "url"
 	TypeContact = "contact"
+	// TypeRichText — форматированный текст (F-141): Markdown строкой; HTML —
+	// только безопасным подмножеством, очищается при показе.
+	TypeRichText = "rich_text"
 )
 
 // FieldTypes — все типы полей формата v0.
 var FieldTypes = []string{TypeText, TypeNumber, TypeDate, TypeBool, TypeChoice, TypeRef,
-	TypeImage, TypePlace, TypePhone, TypeEmail, TypeURL, TypeContact}
+	TypeImage, TypeFile, TypePlace, TypePhone, TypeEmail, TypeURL, TypeContact, TypeRichText}
 
 // StageKey — системное поле этапа (F-37); DefaultStage — этап «не выбран».
 const (
@@ -289,6 +295,10 @@ func Keys(items []json.RawMessage) []string {
 // FreeMeta — пометка в meta значения выбора: своё значение, а не ключ
 // варианта (F-104).
 const FreeMeta = "free"
+
+// FileMeta — сведения о файле в meta значения поля file (KIN-27):
+// {name, mime, size} — имя при загрузке, тип и размер для показа.
+const FileMeta = "file"
 
 // OptionByName — ключ варианта выбора по названию (без учёта регистра и
 // пробелов по краям): своё значение, совпавшее с вариантом, хранится его

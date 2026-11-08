@@ -45,6 +45,9 @@ function active(name: string): boolean {
   return route.name === name
 }
 
+/** разделы дашборда: гостю (F-03) корзина не нужна — она только у владельца */
+const nav = computed(() => (dashboards.isGuest(dash.value) ? NAV.filter(n => n.name !== 'trash') : NAV))
+
 const initials = computed(() => (session.account?.login ?? '').slice(0, 2).toUpperCase())
 </script>
 
@@ -89,7 +92,7 @@ const initials = computed(() => (session.account?.login ?? '').slice(0, 2).toUpp
         </RouterLink>
       </span>
       <RouterLink
-        v-for="n in NAV"
+        v-for="n in nav"
         :key="n.name"
         class="nav-item"
         :class="{ active: active(n.name) }"

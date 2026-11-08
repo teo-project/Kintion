@@ -1,0 +1,22 @@
+name: Feature request
+description: An idea or a larger change (discuss it before writing code)
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario
+      description: What you want to do and why; a concrete example with made-up people helps most
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work, if you have an idea
+  - type: checkboxes
+    id: roadmap
+    attributes:
+      label: Roadmap
+      options:
+        - label: I have checked docs/roadmap.md

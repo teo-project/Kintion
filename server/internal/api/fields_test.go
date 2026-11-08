@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
+	"net/url"
 	"testing"
 )
 
@@ -307,7 +307,8 @@ func TestCustomFieldTypesAndShared(t *testing.T) {
 	}}), http.StatusOK, "drop unused option, rename used")
 	expect(t, c.do("POST", "/api/records/"+id+"/fields/custom.faith/values", map[string]any{"if_rev": 1, "value": "z"}),
 		http.StatusBadRequest, "unknown option")
-	addValue(t, c, id, "custom.pic", map[string]any{"if_rev": 0, "value": strings.Repeat("a", 64),
+	_, png := c.upload(dash, testPNG(t))
+	addValue(t, c, id, "custom.pic", map[string]any{"if_rev": 0, "value": png["sha256"],
 		"meta": map[string]any{"crop": map[string]any{"card": map[string]any{"x": 0, "y": 0, "w": 10, "h": 5, "shape": "rect"}}}})
 	addValue(t, c, id, "custom.friend", map[string]any{"if_rev": 0, "value": other})
 	expect(t, c.do("POST", "/api/records/"+id+"/fields/custom.friend/values", map[string]any{"if_rev": 1, "value": pair}),
@@ -490,4 +491,26 @@ func TestFreeChoiceToggle(t *testing.T) {
 	expect(t, r, http.StatusOK, "own equal to key")
 	expect(t, c.do("PATCH", "/api/records/"+id, map[string]any{"if_rev": 4, "custom_fields": []any{mood(false)}}),
 		http.StatusBadRequest, "back with own value")
+}
+
+// F-141: форматированный текст — своё поле и значение-строка Markdown как есть
+// (HTML не очищается при сохранении — только при показе); находится поиском.
+func TestCustomRichText(t *testing.T) {
+	e := newEnv(t)
+	c := e.setupOwner()
+	dash := dashboardOf(t, c)
+	id := person(t, c, dash, nil)
+	expect(t, c.do("PATCH", "/api/records/"+id, map[string]any{"if_rev": 0, "custom_fields": []any{
+		map[string]any{"key": "story", "type": "rich_text", "name": "История"},
+	}}), http.StatusOK, "rich_text custom field")
+	md := "# Детство\n\n**Родился** в деревне _Горки_.\n\n<script>alert(1)</script>"
+	_, rec := addValue(t, c, id, "custom.story", map[string]any{"if_rev": 0, "value": md})
+	if v := values(rec, "custom.story"); len(v) != 1 || v[0]["value"] != md {
+		t.Fatalf("stored %v", v)
+	}
+	expect(t, c.do("POST", "/api/records/"+id+"/fields/custom.story/values", map[string]any{"if_rev": 1, "value": 5}),
+		http.StatusBadRequest, "not a string")
+	if got := list(t, c, dash, url.Values{"q": {"деревне"}}); !got[id] {
+		t.Fatalf("search did not find rich text: %v", got)
+	}
 }

@@ -1,5 +1,5 @@
 // Package files — файлы на локальном томе (F-29): изображения записей и их
-// превью. Имя файла — sha256 содержимого, путь STORAGE_PATH/files/ab/cd/<sha256>;
+// превью, файлы полей типа file (любого типа, KIN-27). Имя файла — sha256 содержимого, путь STORAGE_PATH/files/ab/cd/<sha256>;
 // запись — во временный файл и атомарное переименование. Доступ проверяет
 // вызывающий через internal/authz (F-30, Д-25).
 package files
@@ -71,7 +71,11 @@ func (s *Store) tmpDir() (string, error) {
 
 // Put сохраняет содержимое r: проверяет размер и тип, пишет во временный
 // файл и переносит на место. Повторная загрузка того же содержимого — тот же путь.
-func (s *Store) Put(r io.Reader) (Info, error) {
+// anyType — принимается любой файл: тип — по содержимому, размеры — только у
+// изображения поддерживаемого формата не больше MaxPixels (у него есть
+// превью); иначе — только
+// изображения (Д-26).
+func (s *Store) Put(r io.Reader, anyType bool) (Info, error) {
 	dir, err := s.tmpDir()
 	if err != nil {
 		return Info{}, err
@@ -99,35 +103,12 @@ func (s *Store) Put(r io.Reader) (Info, error) {
 	head := make([]byte, 512)
 	k, _ := f.ReadAt(head, 0)
 	info.MIME = http.DetectContentType(head[:k])
-	if !Mimes[info.MIME] {
-		return Info{}, ErrUnsupported
-	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
+	switch err := s.measure(f, &info); {
+	case err == nil:
+	case anyType && (errors.Is(err, ErrUnsupported) || errors.Is(err, ErrTooLarge)):
+		info.Width, info.Height = 0, 0 // файл без превью (в т. ч. огромный скан)
+	default:
 		return Info{}, err
-	}
-	cfg, _, err := image.DecodeConfig(f)
-	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
-		return Info{}, ErrUnsupported
-	}
-	if int64(cfg.Width)*int64(cfg.Height) > MaxPixels {
-		return Info{}, ErrTooLarge
-	}
-	// заголовок может быть цел, а данные — обрезаны: декодируем полностью,
-	// чтобы битый файл не стал оригиналом без превью
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return Info{}, err
-	}
-	if _, _, err := image.Decode(f); err != nil {
-		return Info{}, ErrUnsupported
-	}
-	info.Width, info.Height = cfg.Width, cfg.Height
-	if info.MIME == "image/jpeg" {
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return Info{}, err
-		}
-		if swapsAxes(jpegOrientation(f)) {
-			info.Width, info.Height = info.Height, info.Width
-		}
 	}
 	if err := f.Sync(); err != nil {
 		return Info{}, err
@@ -147,6 +128,42 @@ func (s *Store) Put(r io.Reader) (Info, error) {
 		return Info{}, fmt.Errorf("files: %w", err)
 	}
 	return info, nil
+}
+
+// measure проверяет изображение и заполняет размеры; не изображение
+// поддерживаемого формата или битое — ErrUnsupported.
+func (s *Store) measure(f *os.File, info *Info) error {
+	if !Mimes[info.MIME] {
+		return ErrUnsupported
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	cfg, _, err := image.DecodeConfig(f)
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return ErrUnsupported
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > MaxPixels {
+		return ErrTooLarge
+	}
+	// заголовок может быть цел, а данные — обрезаны: декодируем полностью,
+	// чтобы битый файл не стал оригиналом без превью
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if _, _, err := image.Decode(f); err != nil {
+		return ErrUnsupported
+	}
+	info.Width, info.Height = cfg.Width, cfg.Height
+	if info.MIME == "image/jpeg" {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		if swapsAxes(jpegOrientation(f)) {
+			info.Width, info.Height = info.Height, info.Width
+		}
+	}
+	return nil
 }
 
 // Open открывает оригинал.

@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"reflect"
@@ -27,6 +29,99 @@ func (a *API) dashboardRoutes() {
 	a.mux.HandleFunc("GET /api/dashboards/{d}/schema", a.dashboardSchema)
 	a.mux.HandleFunc("PUT /api/dashboards/{d}/templates/{t}/custom_fields", a.putSharedFields)
 	a.mux.HandleFunc("PUT /api/dashboards/{d}/templates/{t}/quick_fields", a.putQuickFields)
+	a.mux.HandleFunc("GET /api/dashboards/{d}/eras", a.getEras)
+	a.mux.HandleFunc("PUT /api/dashboards/{d}/eras", a.putEras)
+}
+
+// getEras — эры дашборда с действующим списком (F-143).
+func (a *API) getEras(w http.ResponseWriter, r *http.Request) {
+	q := sqlc.New(a.d.Pool)
+	acc, err := a.viewOf(r, q)
+	if err != nil {
+		a.recordError(w, r, err)
+		return
+	}
+	out, err := dashboards.LoadEras(r.Context(), q, acc.Dashboard.ID)
+	if err != nil {
+		a.internal(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// erasIn — тело правки эр дашборда (F-143): настройки целиком и, при смене
+// эры по умолчанию «к уже созданным» или переименовании эры, замена — одна
+// ({from, to}) или список замен по порядку.
+type erasIn struct {
+	IfRev   int64           `json:"if_rev"`
+	Eras    dashboards.Eras `json:"eras"`
+	Replace json.RawMessage `json:"replace"`
+}
+
+// replaces — замены из тела: объект, список или ничего (null).
+func (in erasIn) replaces() ([]dashboards.Replace, error) {
+	raw := bytes.TrimSpace(in.Replace)
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	if raw[0] == '[' {
+		var list []dashboards.Replace
+		err := json.Unmarshal(raw, &list)
+		return list, err
+	}
+	var one dashboards.Replace
+	if err := json.Unmarshal(raw, &one); err != nil {
+		return nil, err
+	}
+	return []dashboards.Replace{one}, nil
+}
+
+// putEras — эры дашборда; ответ — эры с действующим списком.
+func (a *API) putEras(w http.ResponseWriter, r *http.Request) {
+	var in erasIn
+	if !decode(w, r, &in) {
+		return
+	}
+	reps, err := in.replaces()
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusBadRequest, ValidationBody{Error: "validation", Field: "replace", Message: "замена — {from, to} или список таких"})
+		return
+	}
+	sess, _ := SessionFrom(r.Context())
+	ctx := r.Context()
+	var out dashboards.ErasDTO
+	found := true
+	err = pgx.BeginFunc(ctx, a.d.Pool, func(tx pgx.Tx) error {
+		q := sqlc.New(tx)
+		d, ok := a.dashboard(w, r, q)
+		if !ok {
+			found = false
+			return nil
+		}
+		if _, err := dashboards.SaveEras(ctx, tx, operation(r, sess.Account.ID), d, in.IfRev, in.Eras, reps); err != nil {
+			return err
+		}
+		var err error
+		out, err = dashboards.LoadEras(ctx, q, d.ID)
+		return err
+	})
+	if !found {
+		return
+	}
+	if errors.Is(err, dashboards.ErrErasConflict) {
+		httpx.WriteError(w, http.StatusConflict, "conflict", err.Error())
+		return
+	}
+	if errors.Is(err, dashboards.ErrEras) {
+		field, msg := dashboards.EraField(err)
+		httpx.WriteJSON(w, http.StatusBadRequest, ValidationBody{Error: "validation", Field: field, Message: msg})
+		return
+	}
+	if err != nil {
+		a.internal(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
 // putSharedFields — общие свои поля шаблона в дашборде (F-96) целиком, с
@@ -94,10 +189,21 @@ func operation(r *http.Request, actor uuid.UUID) *audit.Operation {
 }
 
 // firstDashboard — в транзакции настройки: журнал создания владельца и первый
-// дашборд (В-9: дашбордов несколько, первый — автоматически).
+// дашборд (В-9: дашбордов несколько, первый — автоматически). Автор в журнале —
+// сам новый аккаунт (настройка, регистрация).
 func (a *API) firstDashboard(r *http.Request) auth.SetupHook {
+	return a.firstDashboardBy(r, nil)
+}
+
+// firstDashboardBy — то же; by — автор в журнале, если аккаунт заводит другой
+// (админ, F-28); nil — сам новый аккаунт.
+func (a *API) firstDashboardBy(r *http.Request, by *uuid.UUID) auth.SetupHook {
 	return func(ctx context.Context, tx pgx.Tx, acc sqlc.Account) error {
-		op := operation(r, acc.ID)
+		actor := acc.ID
+		if by != nil {
+			actor = *by
+		}
+		op := operation(r, actor)
 		if err := op.Write(ctx, sqlc.New(tx), audit.Entry{
 			Object: "account", ObjectID: &acc.ID, Op: audit.OpCreate,
 			After: AccountDTO{ID: acc.ID, Login: acc.Login, IsAdmin: acc.IsAdmin},
@@ -115,14 +221,33 @@ func (a *API) firstDashboard(r *http.Request) auth.SetupHook {
 
 func (a *API) listDashboards(w http.ResponseWriter, r *http.Request) {
 	sess, _ := SessionFrom(r.Context())
-	rows, err := sqlc.New(a.d.Pool).ListDashboardsByOwner(r.Context(), sess.Account.ID)
+	q := sqlc.New(a.d.Pool)
+	rows, err := q.ListDashboardsByOwner(r.Context(), sess.Account.ID)
 	if err != nil {
 		a.internal(w, r, err)
 		return
 	}
-	out := make([]dashboards.DTO, 0, len(rows))
+	shared, err := q.ListSharedDashboards(r.Context(), sess.Account.ID)
+	if err != nil {
+		a.internal(w, r, err)
+		return
+	}
+	// свои, затем чужие, где приглашение принято (F-03)
+	out := make([]SharedDashboardDTO, 0, len(rows)+len(shared))
 	for _, d := range rows {
-		out = append(out, dashboards.ToDTO(d))
+		out = append(out, SharedDashboardDTO{DTO: dashboards.ToDTO(d), CanEdit: true})
+	}
+	for _, d := range shared {
+		if d.AcceptedAt == nil {
+			continue
+		}
+		// может ли гость создавать записи — как при создании (F-149)
+		acc, err := authz.View(r.Context(), q, sess.Account.ID, d.ID)
+		if err != nil {
+			a.internal(w, r, err)
+			return
+		}
+		out = append(out, SharedDashboardDTO{DTO: dashboards.DTO{ID: d.ID, Name: d.Name, CreatedAt: d.CreatedAt}, Guest: true, OwnerNick: d.OwnerNick, CanEdit: acc.CanCreate()})
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -218,11 +343,12 @@ func (a *API) renameDashboard(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) dashboardSchema(w http.ResponseWriter, r *http.Request) {
 	q := sqlc.New(a.d.Pool)
-	d, ok := a.dashboard(w, r, q)
-	if !ok {
+	acc, err := a.viewOf(r, q)
+	if err != nil {
+		a.recordError(w, r, err)
 		return
 	}
-	out, err := dashboards.Schema(r.Context(), q, a.d.Registry, d.ID)
+	out, err := dashboards.Schema(r.Context(), q, a.d.Registry, acc.Dashboard.ID)
 	if err != nil {
 		a.internal(w, r, err)
 		return

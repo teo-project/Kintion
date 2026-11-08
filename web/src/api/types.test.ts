@@ -12,7 +12,7 @@ const fieldsOut: Pick<RecordOut, 'record'> = fields
 
 const envelopeKeys: (keyof RecordDTO)[] = [
   'id', 'entity', 'template', 'template_id', 'start', 'end', 'note', 'title_manual', 'sensitive',
-  'groups', 'custom_fields', 'fields', 'revs', 'participants', 'participates_in', 'deleted',
+  'groups', 'custom_fields', 'custom_sections', 'fields', 'revs', 'participants', 'participates_in', 'deleted', 'editable',
 ]
 
 describe('эталоны API', () => {

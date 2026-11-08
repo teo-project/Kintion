@@ -4,11 +4,12 @@
 // прототипа format-v0; правила Д-19 (занятость роли), Д-20 (на сегодня),
 // Д-21 (шаблон новой записи).
 
+import { isEmptyDate } from './dates'
 import { activeToday, currentStage } from './forms'
 import { treeAs, treeLinkOf } from './tree/graph'
 import type { Side } from './tree/suggest'
 import { defaultTemplate, periodLabel, systemLabel, type Registry, type Words } from './registry'
-import { evalElements, isFreeText, NOTE, rawValue, sameRaw, STAGE, tplOf, valueIn, type Ctx } from './resolver'
+import { evalElements, isDateLike, isFreeText, NOTE, rawValue, sameRaw, STAGE, tplOf, valueIn, type Ctx } from './resolver'
 import type {
   BatchIn, FieldDef, GrammarElement, NewRecordIn, PartialDate, QuickAddItem, RecordDTO, RoleDef, TemplateDef,
 } from './types'
@@ -214,16 +215,14 @@ function normalizeText(v: unknown): unknown {
   return isFreeText(v) ? { free: v.free.trim() } : v
 }
 
-function isDate(v: unknown): v is PartialDate {
-  return !!v && typeof v === 'object' && ('y' in v || 'm' in v || 'd' in v)
-}
+const isDate = (v: unknown): v is PartialDate => isDateLike(v)
 
 /** Значение по ключу предзаполнения / формы в новую запись пакета; пустое не пишется. */
 function putValue(rec: NewRecordIn, key: string, val: unknown) {
   if (val == null || val === '') return
   if (key === '.' + NOTE) rec.note = String(val)
   else if (key === 'start' || key === 'end') {
-    if (isDate(val) && (val.y != null || val.m != null || val.d != null)) rec[key] = { value: val }
+    if (isDate(val) && !isEmptyDate(val)) rec[key] = { value: val }
   } else (rec.fields ??= {})[key] = [valueIn(val)]
 }
 

@@ -15,22 +15,26 @@ import (
 // RecordDTO — конверт записи (план §5). Подписи, формы ролей и меню (+)
 // считает фронтенд по реестру (Д-12).
 type RecordDTO struct {
-	ID             uuid.UUID            `json:"id"`
-	Entity         string               `json:"entity"`
-	Template       string               `json:"template"`
-	TemplateID     uuid.UUID            `json:"template_id"`
-	Start          *PeriodDTO           `json:"start"`
-	End            *PeriodDTO           `json:"end"`
-	Note           *string              `json:"note"`
-	TitleManual    *string              `json:"title_manual"`
-	Sensitive      bool                 `json:"sensitive"`
-	Groups         []uuid.UUID          `json:"groups"`
-	CustomFields   []json.RawMessage    `json:"custom_fields"`
+	ID           uuid.UUID         `json:"id"`
+	Entity       string            `json:"entity"`
+	Template     string            `json:"template"`
+	TemplateID   uuid.UUID         `json:"template_id"`
+	Start        *PeriodDTO        `json:"start"`
+	End          *PeriodDTO        `json:"end"`
+	Note         *string           `json:"note"`
+	TitleManual  *string           `json:"title_manual"`
+	Sensitive    bool              `json:"sensitive"`
+	Groups       []uuid.UUID       `json:"groups"`
+	CustomFields []json.RawMessage `json:"custom_fields"`
+	// CustomSections — свои блоки записи (F-139): [{ key, name }].
+	CustomSections []json.RawMessage    `json:"custom_sections"`
 	Fields         map[string]*FieldDTO `json:"fields"`
 	Revs           map[string]int64     `json:"revs"` // версии системных полей (F-45)
 	Participants   []ParticipantDTO     `json:"participants"`
 	ParticipatesIn []ParticipationDTO   `json:"participates_in"`
 	Deleted        bool                 `json:"deleted"`
+	// Editable — смотрящий может изменять запись (гость — с меткой группы с правкой, F-148)
+	Editable bool `json:"editable"`
 
 	refs []uuid.UUID // соседи для related
 }
@@ -42,9 +46,12 @@ type PeriodDTO struct {
 }
 
 // FieldDTO — поле: версия и значения в ручном порядке (верхнее — текущее).
+// Hidden — одиночное поле занято значением, скрытым от гостя (ссылка на
+// невидимую ему запись, Q-50): гостю — «Задано», без правки.
 type FieldDTO struct {
 	Rev    int64      `json:"rev"`
 	Values []ValueDTO `json:"values"`
+	Hidden bool       `json:"hidden,omitempty"`
 }
 
 // ValueDTO — значение поля. Value — по колонке: строка, число, частичная
@@ -185,9 +192,9 @@ func (t *Tx) Envelopes(recs []*Rec) (map[uuid.UUID]*RecordDTO, error) {
 		d := &RecordDTO{
 			ID: row.ID, Entity: row.Entity, Template: r.T.ID, TemplateID: row.TemplateID,
 			Note: row.Note, TitleManual: row.TitleManual, Sensitive: row.Sensitive,
-			Groups: []uuid.UUID{}, CustomFields: []json.RawMessage{}, Fields: map[string]*FieldDTO{},
-			Revs: map[string]int64{}, Participants: []ParticipantDTO{}, ParticipatesIn: []ParticipationDTO{},
-			Deleted: row.DeletedAt != nil,
+			Groups: []uuid.UUID{}, CustomFields: []json.RawMessage{}, CustomSections: []json.RawMessage{},
+			Fields: map[string]*FieldDTO{}, Revs: map[string]int64{}, Participants: []ParticipantDTO{}, ParticipatesIn: []ParticipationDTO{},
+			Deleted: row.DeletedAt != nil, Editable: t.CanEdit(row.ID),
 		}
 		d.Start = period(row.StartDate, seen(row.StartLink))
 		d.End = period(row.EndDate, seen(row.EndLink))
@@ -200,6 +207,9 @@ func (t *Tx) Envelopes(recs []*Rec) (map[uuid.UUID]*RecordDTO, error) {
 		if len(row.CustomFields) > 0 {
 			_ = json.Unmarshal(row.CustomFields, &d.CustomFields)
 		}
+		if len(row.CustomSections) > 0 {
+			_ = json.Unmarshal(row.CustomSections, &d.CustomSections)
+		}
 		for _, k := range systemRevKeys {
 			d.Revs[k] = 0
 		}
@@ -208,6 +218,7 @@ func (t *Tx) Envelopes(recs []*Rec) (map[uuid.UUID]*RecordDTO, error) {
 		}
 		out[row.ID] = d
 	}
+	// версии — те же, что у владельца, и гостю (F-147)
 	for _, rv := range revs {
 		d := out[rv.EntityID]
 		if isSystemRev(rv.FieldKey) {
@@ -222,7 +233,20 @@ func (t *Tx) Envelopes(recs []*Rec) (map[uuid.UUID]*RecordDTO, error) {
 			linksOf[l.EntryID] = append(linksOf[l.EntryID], LinkDTO{Target: l.TargetID, Anchor: l.Anchor})
 		}
 	}
+	recOf := make(map[uuid.UUID]*Rec, len(recs))
+	for _, r := range recs {
+		recOf[r.Row.ID] = r
+	}
 	for _, e := range entries {
+		// значение-ссылка на невидимую гостю запись не показывается вовсе:
+		// пустое значение выдало бы, что ссылка есть (F-05, F-07, F-42);
+		// одиночное поле с таким значением — «занято» (Q-50)
+		if t.Guest() && e.VRef != nil && seen(e.VRef) == nil {
+			if single(defOf(recOf[e.EntityID], e.FieldKey)) {
+				out[e.EntityID].field(e.FieldKey).Hidden = true
+			}
+			continue
+		}
 		d := out[e.EntityID]
 		v := valueDTO(e, linksOf[e.ID], seen(e.VRef) != nil)
 		if e.VRef != nil && seen(e.VRef) != nil {
@@ -246,7 +270,7 @@ func (t *Tx) Envelopes(recs []*Rec) (map[uuid.UUID]*RecordDTO, error) {
 	}
 	// участия: по началу контейнера (Д-9), без даты — в конце по времени создания (Д-27)
 	slices.SortStableFunc(partsIn, func(a, b sqlc.Participation) int {
-		return strings.Compare(startKey(vis[a.ContainerID]), startKey(vis[b.ContainerID]))
+		return strings.Compare(t.startKey(vis[a.ContainerID]), t.startKey(vis[b.ContainerID]))
 	})
 	for _, p := range partsIn {
 		if seen(&p.ContainerID) == nil {
@@ -259,18 +283,22 @@ func (t *Tx) Envelopes(recs []*Rec) (map[uuid.UUID]*RecordDTO, error) {
 		d.refs = append(d.refs, p.ContainerID)
 	}
 	for _, g := range groups {
+		if !t.GroupVisible(g.GroupID) {
+			continue // метки невидимых гостю групп не показываются (F-07)
+		}
 		d := out[g.EntityID]
 		d.Groups = append(d.Groups, g.GroupID)
 	}
 	return out, nil
 }
 
-// startKey — ключ сортировки по началу записи; без даты — после датированных.
-func startKey(row sqlc.Entity) string {
+// startKey — ключ сортировки по началу записи с порядком эр дашборда (F-143);
+// без даты — после датированных.
+func (t *Tx) startKey(row sqlc.Entity) string {
 	if row.StartDate == nil {
 		return "~"
 	}
-	return row.StartDate.SortKey()
+	return row.StartDate.SortKey(t.eraOrder)
 }
 
 func (d *RecordDTO) field(key string) *FieldDTO {

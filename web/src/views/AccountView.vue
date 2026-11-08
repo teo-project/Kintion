@@ -8,6 +8,8 @@ import { errorText, fmt, t } from '@/i18n'
 import { useSessionStore } from '@/stores/session'
 import { usePrefs } from '@/ui/prefs'
 import { PROJECT_REPO_URL } from '@/ui/project'
+import AccountNick from '../components/AccountNick.vue'
+import AdminAccounts from '../components/AdminAccounts.vue'
 import KinIcon from '../components/KinIcon.vue'
 
 const session = useSessionStore()
@@ -108,6 +110,8 @@ async function logout() {
         </button>
       </p>
     </section>
+    <AccountNick />
+    <AdminAccounts />
     <section class="kin-island">
       <h2 class="kin-section-title">
         {{ t.card.cardMode.setting }}

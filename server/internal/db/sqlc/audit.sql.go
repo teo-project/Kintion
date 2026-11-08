@@ -147,16 +147,18 @@ WHERE a.dashboard_id = $1::uuid
   AND ($4::uuid IS NULL OR a.actor_id = $4::uuid)
   AND (NOT $5::bool OR a.actor_id IS NULL)
   AND ($6::text IS NULL OR a.op = $6::text)
+  AND NOT (a.object = ANY ($7::text[]))
 ORDER BY a.at, a.id
 `
 
 type ListAuditEntriesParams struct {
-	DashboardID uuid.UUID
-	Operations  []uuid.UUID
-	Entity      *uuid.UUID
-	Actor       *uuid.UUID
-	SystemOnly  bool
-	Op          *string
+	DashboardID   uuid.UUID
+	Operations    []uuid.UUID
+	Entity        *uuid.UUID
+	Actor         *uuid.UUID
+	SystemOnly    bool
+	Op            *string
+	HiddenObjects []string
 }
 
 type ListAuditEntriesRow struct {
@@ -187,6 +189,7 @@ func (q *Queries) ListAuditEntries(ctx context.Context, arg ListAuditEntriesPara
 		arg.Actor,
 		arg.SystemOnly,
 		arg.Op,
+		arg.HiddenObjects,
 	)
 	if err != nil {
 		return nil, err
@@ -235,6 +238,7 @@ WITH hits AS (
       AND ($7::uuid IS NULL OR a.actor_id = $7::uuid)
       AND (NOT $8::bool OR a.actor_id IS NULL)
       AND ($9::text IS NULL OR a.op = $9::text)
+      AND NOT (a.object = ANY ($10::text[]))
     GROUP BY a.operation_id
 )
 SELECT operation_id, last_at FROM hits
@@ -245,15 +249,16 @@ LIMIT $3::int
 `
 
 type ListAuditOperationsParams struct {
-	BeforeAt    *time.Time
-	BeforeOp    uuid.UUID
-	Lim         int32
-	DashboardID uuid.UUID
-	Entity      *uuid.UUID
-	Operation   *uuid.UUID
-	Actor       *uuid.UUID
-	SystemOnly  bool
-	Op          *string
+	BeforeAt      *time.Time
+	BeforeOp      uuid.UUID
+	Lim           int32
+	DashboardID   uuid.UUID
+	Entity        *uuid.UUID
+	Operation     *uuid.UUID
+	Actor         *uuid.UUID
+	SystemOnly    bool
+	Op            *string
+	HiddenObjects []string
 }
 
 type ListAuditOperationsRow struct {
@@ -262,7 +267,8 @@ type ListAuditOperationsRow struct {
 }
 
 // Страница операций журнала дашборда, новые сверху; курсор — (время, операция)
-// последней операции предыдущей страницы. Фильтр по записи включает и участия
+// последней операции предыдущей страницы; hidden_objects — объекты, которых
+// смотрящему не показывают (гостю — дела владельца), до разбивки на страницы. Фильтр по записи включает и участия
 // записи в чужих контейнерах (entity_id участника лежит в снимке).
 func (q *Queries) ListAuditOperations(ctx context.Context, arg ListAuditOperationsParams) ([]ListAuditOperationsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditOperations,
@@ -275,6 +281,7 @@ func (q *Queries) ListAuditOperations(ctx context.Context, arg ListAuditOperatio
 		arg.Actor,
 		arg.SystemOnly,
 		arg.Op,
+		arg.HiddenObjects,
 	)
 	if err != nil {
 		return nil, err

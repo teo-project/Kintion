@@ -19,9 +19,11 @@ import NoteEditor from '@/components/card/NoteEditor.vue'
 import SystemDate from '@/components/card/SystemDate.vue'
 import TitleEditor from '@/components/card/TitleEditor.vue'
 import CustomFieldEditor from '@/components/field/CustomFieldEditor.vue'
+import CustomSectionEditor from '@/components/field/CustomSectionEditor.vue'
 import FieldRow from '@/components/field/FieldRow.vue'
 import HistoryChoiceDialog from '@/components/field/HistoryChoiceDialog.vue'
 import HistoryPopover from '@/components/field/HistoryPopover.vue'
+import ImageLightbox from '@/components/field/ImageLightbox.vue'
 import KinCheckbox from '@/components/KinCheckbox.vue'
 import KinIcon from '@/components/KinIcon.vue'
 
@@ -33,17 +35,26 @@ import { isEmptyDate } from '@/core/dates'
 import type { FieldView, SectionView } from '@/core/card'
 import { STAGE } from '@/core/resolver'
 import { errorText, t } from '@/i18n'
-import { rememberDashboard } from '@/stores/dashboards'
+import { rememberDashboard, useDashboardsStore } from '@/stores/dashboards'
 import { provideRecord, useRecordState } from '@/ui/record'
 
 /** embedded — карточка поверх дерева (F-113): без «Назад» */
 const props = defineProps<{ d: string; id: string; embedded?: boolean }>()
+// гость чужого дашборда (F-03): без «В корзину»; без права правки (F-148) —
+// без быстрого добавления и создания связей
+const dashboardsStore = useDashboardsStore()
+dashboardsStore.load().catch(() => undefined)
+const guest = computed(() => dashboardsStore.isGuest(props.d))
+const canCreate = computed(() => dashboardsStore.canCreate(props.d))
 
 /** ключ версии чувствительности (план §4) */
 const SENSITIVE = 'sensitive'
 
 const router = useRouter()
 // черновик (F-88) стал записью — её адрес вместо адреса черновика
+/** фото в шапке — просмотр оригинала с зумом (KIN-27) */
+const photoView = ref(false)
+
 const s = useRecordState(toRef(props, 'd'), toRef(props, 'id'), id => {
   void router.replace({ name: 'record', params: { d: props.d, id } })
 })
@@ -82,9 +93,15 @@ watch(() => [props.d, props.id], () => {
 
 const card = s.card
 
+/**
+ * Поле быстрой формы дашборда (F-124) в правке стоит сразу, даже пустое:
+ * `show: filled` для него не действует.
+ */
+const quickShown = (f: { quick: boolean }) => f.quick && s.editing.value
+
 /** Порядок полей раздела — как в шаблоне; открытые через «Добавить» — на своём месте. */
 function shownFields(sec: SectionView): FieldView[] {
-  const extra = sec.addable.filter(f => revealed.has(f.key))
+  const extra = sec.addable.filter(f => revealed.has(f.key) || quickShown(f))
   if (!extra.length) return sec.fields
   const order = (f: FieldView) => {
     const i = card.value?.template?.fields?.findIndex(x => !f.custom && x.key === f.def.key) ?? -1
@@ -94,12 +111,12 @@ function shownFields(sec: SectionView): FieldView[] {
 }
 
 function hiddenFields(sec: SectionView): FieldView[] {
-  return sec.addable.filter(f => !revealed.has(f.key))
+  return sec.addable.filter(f => !revealed.has(f.key) && !quickShown(f))
 }
 
 /** системные даты (F-99): пустые с `show: filled` — за «Добавить», пока не открыты */
-const shownDates = computed(() => card.value?.dates.filter(x => !x.hidden || revealed.has(DATE_PREFIX + x.key)) ?? [])
-const hiddenDates = computed(() => card.value?.dates.filter(x => x.hidden && !revealed.has(DATE_PREFIX + x.key)) ?? [])
+const shownDates = computed(() => card.value?.dates.filter(x => !x.hidden || revealed.has(DATE_PREFIX + x.key) || quickShown(x)) ?? [])
+const hiddenDates = computed(() => card.value?.dates.filter(x => x.hidden && !revealed.has(DATE_PREFIX + x.key) && !quickShown(x)) ?? [])
 
 /** «Умер» (F-126): при заполненной дате конца не нужен; пустой — за той же кнопкой «Добавить дату» */
 const FLAG_KEY = DATE_PREFIX + 'end_flag'
@@ -109,8 +126,9 @@ const endFilled = computed(() => {
   return !!e && (!!e.link || !isEmptyDate(e.value))
 })
 const endFlag = computed(() => (card.value?.endFlag && !endFilled.value ? card.value.endFlag : null))
-/** пустой признак скрыт при любом `show` пака: он появляется за «Добавить дату» (F-126) */
-const flagShown = computed(() => !!endFlag.value && (!endFlag.value.empty || revealed.has(FLAG_KEY)))
+/** пустой признак скрыт при любом `show` пака: он появляется за «Добавить дату» (F-126);
+ * исключение — признак из быстрой формы дашборда в правке (F-124): стоит сразу */
+const flagShown = computed(() => !!endFlag.value && (!endFlag.value.empty || revealed.has(FLAG_KEY) || quickShown(endFlag.value)))
 /** что предлагает «Добавить дату»: скрытые даты и скрытый признак завершения */
 const dateAdds = computed(() => [
   ...hiddenDates.value.map(x => ({ key: x.key as string, label: x.label })),
@@ -130,7 +148,10 @@ function reveal(sec: SectionView, f: FieldView) {
 /** запись может участвовать в связях — показать «Где участвует» */
 const participant = computed(() => !!card.value && s.reg.value?.entities.get(card.value.entity)?.participant === true)
 
-const sections = computed(() => card.value?.sections.filter(sec => sec.fields.length || sec.addable.length) ?? [])
+/** правка своих полей и блоков открыта (F-139): пустой свой блок виден только в ней */
+const customEditing = computed(() => !!s.rec.value && !s.rec.value.deleted && !s.draft.value && (s.editing.value || s.inlineMode.value))
+const sections = computed(() => card.value?.sections
+  .filter(sec => sec.fields.length || sec.addable.length || (sec.custom && customEditing.value)) ?? [])
 /** основные поля — в шапке карточки (F-90), остальные разделы — отдельными островами */
 const headSections = computed(() => sections.value.filter(sec => sec.key === 'main'))
 const restSections = computed(() => sections.value.filter(sec => sec.key !== 'main'))
@@ -210,12 +231,35 @@ async function toggleSensitive(v: boolean) {
         <section class="kin-island head-island">
           <header class="head kin-hover-row">
             <div class="photo">
+              <button
+                v-if="card.photo"
+                class="photo-view"
+                type="button"
+                :aria-label="t.file.view"
+                :title="t.file.view"
+                @click="photoView = true"
+              >
+                <RecordAvatar
+                  :dashboard="d"
+                  :photo="card.photo"
+                  :title="card.title"
+                  :size="256"
+                  place="card"
+                />
+              </button>
               <RecordAvatar
+                v-else
                 :dashboard="d"
-                :photo="card.photo"
+                :photo="null"
                 :title="card.title"
                 :size="256"
                 place="card"
+              />
+              <ImageLightbox
+                v-if="card.photo"
+                v-model:open="photoView"
+                :src="api.fileUrl(d, card.photo.sha)"
+                :name="card.title"
               />
             </div>
             <div class="head-main">
@@ -246,7 +290,7 @@ async function toggleSensitive(v: boolean) {
                     <KinIcon :name="s.editing.value ? 'check' : 'edit'" />
                   </button>
                   <QuickAddMenu
-                    v-if="!s.draft.value"
+                    v-if="!s.draft.value && canCreate"
                     :dashboard="d"
                   />
                 </div>
@@ -390,7 +434,7 @@ async function toggleSensitive(v: boolean) {
             <section
               v-for="sec in headSections"
               :key="sec.key"
-              class="block head-block"
+              class="block head-block fields-grid"
             >
               <h2 class="kin-section-title section-title">
                 {{ sec.name }}
@@ -479,10 +523,16 @@ async function toggleSensitive(v: boolean) {
           <section
             v-for="sec in restSections"
             :key="sec.key"
-            class="kin-island block"
+            class="kin-island block fields-grid"
           >
             <h2 class="kin-section-title section-title">
               {{ sec.name }}
+              <CustomSectionEditor
+                v-if="sec.custom && customEditing"
+                :def="sec.custom.def"
+                :shared="sec.custom.shared"
+                :used="sec.fields.length + sec.addable.length > 0"
+              />
             </h2>
             <FieldRow
               v-for="f in shownFields(sec)"
@@ -559,6 +609,7 @@ async function toggleSensitive(v: boolean) {
             </KinCheckbox>
             <span class="kin-spacer" />
             <button
+              v-if="!guest"
               class="kin-ibtn kin-ibtn--danger to-trash"
               type="button"
               :disabled="trashBusy"
@@ -586,6 +637,7 @@ async function toggleSensitive(v: boolean) {
           <RelationsBlock
             :relations="card.relations"
             :dashboard="d"
+            :readonly="!canCreate"
           />
         </section>
       </aside>
@@ -613,6 +665,15 @@ async function toggleSensitive(v: boolean) {
 
 .photo {
   flex: none;
+}
+
+.photo-view {
+  display: block;
+  padding: 0;
+  cursor: zoom-in;
+  background: none;
+  border: 0;
+  border-radius: 14px;
 }
 
 .photo :deep(.avatar) {
@@ -712,6 +773,57 @@ async function toggleSensitive(v: boolean) {
   flex: none;
   width: 130px;
   font-size: var(--kin-font-tiny);
+}
+
+/* Поля одного блока — одной ширины (docs/concepts/interface-style.md, «Поля
+   формы одной ширины»): строки полей — подсетка общей сетки блока, колонка
+   иконок справа (история, правка, настройки своего поля) — по самому широкому
+   набору иконок в блоке и резервируется у всех полей, даже без иконок. */
+.fields-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 12px;
+  align-content: start;
+}
+
+.fields-grid > * {
+  grid-column: 1 / -1;
+}
+
+.fields-grid > .add-field {
+  justify-self: start;
+}
+
+.fields-grid > .field-row {
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.fields-grid > .field-row > :deep(.label) {
+  grid-column: 1;
+}
+
+.fields-grid > .field-row > :deep(.values) {
+  grid-column: 2;
+}
+
+.fields-grid > .field-row > :deep(.tools) {
+  grid-column: 3;
+}
+
+.fields-grid > .field-row > :deep(.full) {
+  grid-column: 1 / -1;
+}
+
+/* узкий экран: название — над полем, поле — на обе первые колонки */
+@media (max-width: 560px) {
+  .fields-grid > .field-row > :deep(.label) {
+    grid-column: 1 / -1;
+  }
+
+  .fields-grid > .field-row > :deep(.values) {
+    grid-column: 1 / 3;
+  }
 }
 
 .add-field,

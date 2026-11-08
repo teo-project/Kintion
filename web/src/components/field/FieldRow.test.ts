@@ -133,3 +133,43 @@ describe('значения полей по типам', () => {
     expect(calls.filter(c => c.method === 'POST')).toHaveLength(2)
   })
 })
+
+describe('форматированный текст (F-141)', () => {
+  const story: RecSpec = {
+    id: 'st', template: 'kin.core.person',
+    fields: { name: ['Лиза'], 'custom.story': ['**Родилась** в _Горках_.<img src=x onerror="alert(1)"><a href="javascript:alert(1)">зло</a>'] },
+    custom: [{ key: 'story', type: 'rich_text', name: 'История' }],
+  }
+
+  it('карточка — с форматированием и без опасного', async () => {
+    serve((m, u) => (m === 'GET' && u === '/api/records/st' ? [200, { record: envelope(story), related: {} }] : undefined))
+    const w = await mountRecord('st')
+    const html = row(w, 'История').find('.rich-text').html()
+    expect(html).toContain('<strong>Родилась</strong>')
+    expect(html).toContain('<em>Горках</em>')
+    expect(html).not.toMatch(/onerror|<img|javascript/)
+  })
+
+  it('правка: текст Markdown и предпросмотр, сохранение при уходе из поля', async () => {
+    let rec = envelope(story)
+    const calls = serve((m, u) => {
+      if (u === '/api/me/prefs') return [200, { history_edit: 'replace' }]
+      if (m === 'GET' && u.startsWith('/api/records/')) return [200, { record: rec, related: {} }]
+      if (u.startsWith('/api/records/st/fields/')) {
+        rec = envelope(story)
+        return [200, { record: rec, related: {} }]
+      }
+      return undefined
+    })
+    const w = await mountRecord('st', true)
+    const r = row(w, 'История')
+    const area = r.find('textarea')
+    expect((area.element as HTMLTextAreaElement).value).toContain('**Родилась**')
+    const [, previewBtn] = r.findAll('.rich-modes button')
+    await previewBtn!.trigger('click')
+    expect(r.find('.rich-preview strong').text()).toBe('Родилась')
+    await r.findAll('.rich-modes button')[0]!.trigger('click')
+    await typeAndBlur(r.find('textarea'), '# Новое')
+    expect(calls.at(-1)).toMatchObject({ method: 'PATCH', url: expect.stringMatching(/fields\/custom\.story\/values\//), body: { value: '# Новое' } })
+  })
+})

@@ -29,6 +29,10 @@ func init() {
 	auth.Params = auth.Argon2Params{Memory: 1024, Time: 1, Threads: 1} // быстрые тесты
 }
 
+// envRegistration — режим регистрации серверов тестов (F-28); тесты не
+// параллельны, тест режима open меняет его на время своего сервера.
+var envRegistration = auth.RegistrationInvite
+
 // testUploadMax — предел загрузки в тестах.
 const testUploadMax = 1 << 20
 
@@ -81,7 +85,7 @@ func newEnvFS(t *testing.T, src fs.FS, lang string, enabled ...string) *env {
 	}
 	storage := t.TempDir()
 	h := api.New(api.Deps{Log: log, Auth: svc, Pool: pool, Registry: reg, Lang: "ru",
-		Files: &files.Store{Root: storage, MaxBytes: testUploadMax}, Licenses: []byte(testLicenses)})
+		Files: &files.Store{Root: storage, MaxBytes: testUploadMax}, Licenses: []byte(testLicenses), Registration: envRegistration})
 	srv := httptest.NewServer(httpx.NewHandler(httpx.Deps{Log: log, DB: pool, API: h, Static: fstest.MapFS{}}))
 	t.Cleanup(srv.Close)
 	return &env{t: t, pool: pool, auth: svc, srv: srv, token: token, reg: reg, storage: storage}

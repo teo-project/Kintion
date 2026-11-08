@@ -14,7 +14,7 @@ import { api } from '@/api/client'
 
 import type { PartialDate } from '@/core/dates'
 import { refAllowed } from '@/core/participants'
-import { freeChoiceValue, isFreeText, recordTitleById, tplOf, type Ctx, type FreeText } from '@/core/resolver'
+import { freeChoiceValue, isFileValue, isFreeText, recordTitleById, tplOf, type Ctx, type FreeText } from '@/core/resolver'
 import type { FieldDef, RecordDTO } from '@/core/types'
 import { t } from '@/i18n'
 import { useRecordMaybe } from '@/ui/record'
@@ -24,6 +24,7 @@ import RecordPicker from '../RecordPicker.vue'
 import KinIcon from '../KinIcon.vue'
 import KinBool from './KinBool.vue'
 import ImagePickDialog from './ImagePickDialog.vue'
+import RichText from './RichText.vue'
 
 const props = defineProps<{
   def: Pick<FieldDef, 'type' | 'options' | 'free'> & { name?: string; entities?: unknown }
@@ -119,9 +120,18 @@ function refTitle(id: unknown): string {
 /** диалог загрузки изображения (F-107) */
 const imagePick = ref(false)
 
+/** форматированный текст (F-141): правка Markdown или предпросмотр */
+const preview = ref(false)
+
 /** изображение: загрузить файл, значение — его sha256 (F-29) */
 async function upload(file: File) {
   emit('update:modelValue', (await api.uploadFile(props.dashboard, file)).sha256)
+}
+
+/** файл (KIN-27): любой; значение — sha256 и сведения для meta (FileValue) */
+async function uploadAny(file: File) {
+  const f = await api.uploadFile(props.dashboard, file, true)
+  emit('update:modelValue', { sha256: f.sha256, name: file.name || f.sha256.slice(0, 12), mime: f.mime, size: f.size })
 }
 
 function pick(id: string) {
@@ -262,6 +272,79 @@ function pick(id: string) {
       :upload="upload"
     />
   </div>
+  <div
+    v-else-if="def.type === 'file'"
+    class="kin-row"
+  >
+    <span
+      v-if="isFileValue(modelValue)"
+      class="file-name"
+    >{{ modelValue.name }}</span>
+    <button
+      class="kin-btn kin-btn--small upload"
+      type="button"
+      @click="imagePick = true"
+    >
+      <KinIcon name="upload" />
+      {{ isFileValue(modelValue) ? t.file.replace : t.file.upload }}
+    </button>
+    <ImagePickDialog
+      v-model:open="imagePick"
+      any
+      :upload="uploadAny"
+    />
+  </div>
+  <div
+    v-else-if="def.type === 'rich_text'"
+    class="rich-edit"
+  >
+    <div
+      class="rich-modes"
+      role="group"
+    >
+      <button
+        class="kin-btn kin-btn--small"
+        type="button"
+        :aria-pressed="!preview"
+        @click="preview = false"
+      >
+        {{ t.richText.write }}
+      </button>
+      <button
+        class="kin-btn kin-btn--small"
+        type="button"
+        :aria-pressed="preview"
+        @click="preview = true"
+      >
+        {{ t.richText.preview }}
+      </button>
+    </div>
+    <textarea
+      v-show="!preview"
+      class="kin-input rich-input"
+      rows="6"
+      :value="text"
+      :aria-label="def.name"
+      @input="onText"
+      @keydown.ctrl.enter.prevent="emit('submit')"
+      @keydown.meta.enter.prevent="emit('submit')"
+    />
+    <div
+      v-if="preview"
+      class="kin-input rich-preview"
+      tabindex="0"
+    >
+      <RichText
+        v-if="text.trim()"
+        :source="text"
+      />
+      <span
+        v-else
+        class="kin-muted"
+      >{{ t.common.empty }}</span>
+    </div>
+    <small class="kin-muted rich-hint">{{ t.richText.hint }}</small>
+  </div>
   <input
     v-else
     class="kin-input"
@@ -316,6 +399,48 @@ function pick(id: string) {
 
 .combo-item[data-highlighted] {
   background: var(--kin-color-accent-soft);
+}
+
+.rich-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kin-space-1);
+  width: 100%;
+  min-width: 0;
+}
+
+.rich-modes {
+  display: flex;
+  gap: var(--kin-space-1);
+}
+
+.rich-modes [aria-pressed='true'] {
+  background: var(--kin-color-accent-soft);
+}
+
+.rich-input {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.rich-preview {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 8rem;
+  height: auto;
+  font-weight: 400;
+}
+
+.rich-hint {
+  font-size: var(--kin-font-tiny);
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .thumb {

@@ -121,7 +121,7 @@ func (q *Queries) FilterEntitiesByGroup(ctx context.Context, arg FilterEntitiesB
 }
 
 const getGroup = `-- name: GetGroup :one
-SELECT id, dashboard_id, name, sort_key, auto_surname, surnames FROM grp WHERE dashboard_id = $1 AND id = $2
+SELECT id, dashboard_id, name, sort_key, auto_surname, surnames, created_for FROM grp WHERE dashboard_id = $1 AND id = $2
 `
 
 type GetGroupParams struct {
@@ -139,6 +139,7 @@ func (q *Queries) GetGroup(ctx context.Context, arg GetGroupParams) (Grp, error)
 		&i.SortKey,
 		&i.AutoSurname,
 		&i.Surnames,
+		&i.CreatedFor,
 	)
 	return i, err
 }
@@ -218,7 +219,7 @@ func (q *Queries) InsertEntityGroup(ctx context.Context, arg InsertEntityGroupPa
 }
 
 const insertGroup = `-- name: InsertGroup :one
-INSERT INTO grp (id, dashboard_id, name, sort_key, auto_surname, surnames) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, dashboard_id, name, sort_key, auto_surname, surnames
+INSERT INTO grp (id, dashboard_id, name, sort_key, auto_surname, surnames) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, dashboard_id, name, sort_key, auto_surname, surnames, created_for
 `
 
 type InsertGroupParams struct {
@@ -247,6 +248,7 @@ func (q *Queries) InsertGroup(ctx context.Context, arg InsertGroupParams) (Grp, 
 		&i.SortKey,
 		&i.AutoSurname,
 		&i.Surnames,
+		&i.CreatedFor,
 	)
 	return i, err
 }
@@ -267,7 +269,7 @@ func (q *Queries) InsertGroupLink(ctx context.Context, arg InsertGroupLinkParams
 }
 
 const listAutoSurnameGroups = `-- name: ListAutoSurnameGroups :many
-SELECT id, dashboard_id, name, sort_key, auto_surname, surnames FROM grp WHERE dashboard_id = $1 AND auto_surname AND cardinality(surnames) > 0 ORDER BY sort_key, id
+SELECT id, dashboard_id, name, sort_key, auto_surname, surnames, created_for FROM grp WHERE dashboard_id = $1 AND auto_surname AND cardinality(surnames) > 0 ORDER BY sort_key, id
 `
 
 // Группы с автодобавлением по фамилии (F-122).
@@ -287,6 +289,7 @@ func (q *Queries) ListAutoSurnameGroups(ctx context.Context, dashboardID uuid.UU
 			&i.SortKey,
 			&i.AutoSurname,
 			&i.Surnames,
+			&i.CreatedFor,
 		); err != nil {
 			return nil, err
 		}
@@ -329,7 +332,7 @@ func (q *Queries) ListGroupLinks(ctx context.Context, dashboardID uuid.UUID) ([]
 }
 
 const listGroups = `-- name: ListGroups :many
-SELECT id, dashboard_id, name, sort_key, auto_surname, surnames FROM grp WHERE dashboard_id = $1 ORDER BY sort_key, id
+SELECT id, dashboard_id, name, sort_key, auto_surname, surnames, created_for FROM grp WHERE dashboard_id = $1 ORDER BY sort_key, id
 `
 
 func (q *Queries) ListGroups(ctx context.Context, dashboardID uuid.UUID) ([]Grp, error) {
@@ -348,6 +351,7 @@ func (q *Queries) ListGroups(ctx context.Context, dashboardID uuid.UUID) ([]Grp,
 			&i.SortKey,
 			&i.AutoSurname,
 			&i.Surnames,
+			&i.CreatedFor,
 		); err != nil {
 			return nil, err
 		}
@@ -384,7 +388,7 @@ func (q *Queries) ListLabelsByGroup(ctx context.Context, groupID uuid.UUID) ([]u
 }
 
 const listLiveEntitiesByTemplates = `-- name: ListLiveEntitiesByTemplates :many
-SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by FROM entity
+SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections FROM entity
 WHERE dashboard_id = $1 AND deleted_at IS NULL AND template_id = ANY ($2::uuid[])
 ORDER BY id
 `
@@ -422,6 +426,7 @@ func (q *Queries) ListLiveEntitiesByTemplates(ctx context.Context, arg ListLiveE
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.DeletedBy,
+			&i.CustomSections,
 		); err != nil {
 			return nil, err
 		}
@@ -581,7 +586,7 @@ func (q *Queries) RecentGroupsByAccount(ctx context.Context, arg RecentGroupsByA
 }
 
 const updateGroup = `-- name: UpdateGroup :one
-UPDATE grp SET name = $2, sort_key = $3, auto_surname = $4, surnames = $5 WHERE id = $1 RETURNING id, dashboard_id, name, sort_key, auto_surname, surnames
+UPDATE grp SET name = $2, sort_key = $3, auto_surname = $4, surnames = $5 WHERE id = $1 RETURNING id, dashboard_id, name, sort_key, auto_surname, surnames, created_for
 `
 
 type UpdateGroupParams struct {
@@ -608,6 +613,7 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Grp, 
 		&i.SortKey,
 		&i.AutoSurname,
 		&i.Surnames,
+		&i.CreatedFor,
 	)
 	return i, err
 }

@@ -7,7 +7,7 @@ Planned, in no particular order:
 - **Scenes**: saved, configured views ("The Vasilkovs" on the tree)
 - **Import and export**: own format both ways, GEDCOM import (export if feasible)
 - **Duplicate search** and merge with transfer of relations, participation and values
-- **Sharing**: group permissions with inheritance, invitations by nickname, view-only mode without sensitive data, guest editor, "own actions only" journal
+- **Sharing, next steps**: deletion requests by guests, view mode without sensitive data, notifications about new grants
 - **Copying between dashboards**, with an "it is the same person" link
 - **Extensions**: admin-installed packs, sandboxed JavaScript logic for templates, UI slots
 - **Graph at a date**: a time slider — people grow younger, branches appear and vanish

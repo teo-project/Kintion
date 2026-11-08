@@ -40,6 +40,17 @@ export const useSessionStore = defineStore('session', () => {
     checked.value = true
   }
 
+  /** Регистрация (F-28): по приглашению (token) или открытая. */
+  async function register(body: { token?: string; login: string; password: string; nick: string }) {
+    apply(await api.register(body))
+    checked.value = true
+  }
+
+  /** Ник изменён на экране «Аккаунт». */
+  function setAccount(a: AccountDTO) {
+    account.value = a
+  }
+
   async function logout() {
     try {
       await api.logout()
@@ -53,5 +64,5 @@ export const useSessionStore = defineStore('session', () => {
     apply(null)
   }
 
-  return { account, checked, setupNeeded, check, setup, login, logout, lost }
+  return { account, checked, setupNeeded, check, setup, login, register, setAccount, logout, lost }
 })

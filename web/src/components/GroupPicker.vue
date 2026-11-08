@@ -10,6 +10,7 @@ import { api } from '@/api/client'
 
 import { t } from '@/i18n'
 import { suggestGroups } from '@/ui/groups'
+import { useDashboardsStore } from '@/stores/dashboards'
 import { useGroups } from '@/ui/useGroups'
 import KinCheckbox from './KinCheckbox.vue'
 import KinIcon from './KinIcon.vue'
@@ -30,7 +31,10 @@ const props = defineProps<{
 const model = defineModel<string[]>({ required: true })
 
 const { groups, reload } = useGroups(props.dashboard)
-const choices = computed(() => groups.value.filter(g => !props.exclude?.includes(g.id)))
+// гость (F-148): выбирает и снимает только группы с правом правки, новых групп не создаёт
+const guest = computed(() => useDashboardsStore().isGuest(props.dashboard))
+const editable = (id: string) => byId.value.get(id)?.editable !== false
+const choices = computed(() => groups.value.filter(g => !props.exclude?.includes(g.id) && g.editable !== false))
 const byId = computed(() => new Map(groups.value.map(g => [g.id, g])))
 const recent = ref<string[]>([])
 onMounted(async () => {
@@ -81,6 +85,7 @@ async function createGroup() {
       >
         {{ byId.get(id)?.name ?? '…' }}
         <button
+          v-if="editable(id)"
           class="kin-icon-btn"
           type="button"
           :aria-label="`${t.common.delete}: ${byId.get(id)?.name ?? ''}`"
@@ -119,6 +124,7 @@ async function createGroup() {
               </li>
             </ul>
             <form
+              v-if="!guest"
               class="kin-row new-group"
               @submit.prevent="createGroup"
             >

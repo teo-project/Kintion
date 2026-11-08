@@ -15,6 +15,7 @@ import (
 type AccountDTO struct {
 	ID      uuid.UUID `json:"id"`
 	Login   string    `json:"login"`
+	Nick    *string   `json:"nick"`
 	IsAdmin bool      `json:"is_admin"`
 }
 
@@ -26,7 +27,7 @@ type MeDTO struct {
 
 func meOf(s auth.Session) MeDTO {
 	return MeDTO{
-		Account: AccountDTO{ID: s.Account.ID, Login: s.Account.Login, IsAdmin: s.Account.IsAdmin},
+		Account: accountDTO(s.Account),
 		CSRF:    s.CSRF(),
 	}
 }

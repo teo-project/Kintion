@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -193,4 +194,67 @@ func TestFiles(t *testing.T) {
 	if res, _ := c.raw("GET", "/api/files/"+dash+"/"+sha[:60], nil, nil); res.StatusCode != http.StatusNotFound {
 		t.Fatalf("bad sha %d", res.StatusCode)
 	}
+}
+
+// Поле «Файл» (KIN-27): ?any=1 принимает любой файл; изображения и PDF
+// открываются в браузере, прочее — только скачиванием; значение — sha256,
+// имя и тип — в meta значения.
+func TestAnyFile(t *testing.T) {
+	e := newEnv(t, "kin.core")
+	c := e.setupOwner()
+	dash := dashboardOf(t, c)
+	up := func(content []byte) map[string]any {
+		t.Helper()
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		fw, _ := mw.CreateFormFile("file", "doc.bin")
+		_, _ = fw.Write(content)
+		_ = mw.Close()
+		res, data := c.raw("POST", "/api/dashboards/"+dash+"/files?any=1", &buf, map[string]string{"Content-Type": mw.FormDataContentType()})
+		var out map[string]any
+		_ = json.Unmarshal(data, &out)
+		if res.StatusCode != http.StatusCreated {
+			t.Fatalf("upload %d %s", res.StatusCode, data)
+		}
+		return out
+	}
+	pdf := up([]byte("%PDF-1.4 метрическая книга"))
+	if pdf["mime"] != "application/pdf" || pdf["width"] != nil {
+		t.Fatalf("pdf %v", pdf)
+	}
+	res, _ := c.raw("GET", "/api/files/"+dash+"/"+pdf["sha256"].(string), nil, nil)
+	if res.Header.Get("Content-Disposition") != "" || res.Header.Get("Content-Security-Policy") != "default-src 'none'" {
+		t.Fatalf("pdf headers %v", res.Header)
+	}
+	html := up([]byte("<html><script>alert(1)</script></html>"))
+	res, _ = c.raw("GET", "/api/files/"+dash+"/"+html["sha256"].(string), nil, nil)
+	if res.Header.Get("Content-Disposition") != "attachment" || res.Header.Get("Content-Security-Policy") != "default-src 'none'; sandbox" {
+		t.Fatalf("html headers %v", res.Header)
+	}
+	if img := up(testPNG(t)); img["width"] != float64(40) {
+		t.Fatalf("png %v", img)
+	}
+
+	id := person(t, c, dash, nil)
+	expect(t, c.do("PATCH", "/api/records/"+id, map[string]any{"if_rev": 0, "custom_fields": []any{
+		map[string]any{"key": "docs", "type": "file", "name": "Документы", "multiple": true},
+	}}), http.StatusOK, "file field")
+	// тип и размер — по файлу, а не по присланному
+	meta := map[string]any{"file": map[string]any{"name": "Метрика 1890.pdf", "mime": "text/html", "size": 1}}
+	_, rec := addValue(t, c, id, "custom.docs", map[string]any{"if_rev": 0, "value": pdf["sha256"], "meta": meta})
+	if v := values(rec, "custom.docs"); len(v) != 1 || v[0]["value"] != pdf["sha256"] || v[0]["meta"].(map[string]any)["file"].(map[string]any)["name"] != "Метрика 1890.pdf" {
+		t.Fatalf("value %v", v)
+	}
+	if f := values(rec, "custom.docs")[0]["meta"].(map[string]any)["file"].(map[string]any); f["mime"] != "application/pdf" || f["size"] != pdf["size"] || f["preview"] != false {
+		t.Fatalf("file meta %v", f)
+	}
+	expect(t, c.do("POST", "/api/records/"+id+"/fields/custom.docs/values", map[string]any{"if_rev": 1, "value": "не хеш"}),
+		http.StatusBadRequest, "bad sha")
+	expect(t, c.do("POST", "/api/records/"+id+"/fields/custom.docs/values", map[string]any{"if_rev": 1, "value": html["sha256"]}),
+		http.StatusBadRequest, "no name")
+	// в поле image — только изображение с превью; чужой хеш — нет
+	expect(t, c.do("POST", "/api/records/"+id+"/fields/photo/values", map[string]any{"if_rev": 0, "value": pdf["sha256"]}),
+		http.StatusBadRequest, "pdf as photo")
+	expect(t, c.do("POST", "/api/records/"+id+"/fields/photo/values", map[string]any{"if_rev": 0, "value": strings.Repeat("a", 64)}),
+		http.StatusBadRequest, "unknown sha")
 }

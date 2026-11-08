@@ -35,3 +35,13 @@ sql:
               import: kintion/server/internal/partialdate
               type: Date
               pointer: true
+          # 0008: колонки переведены на partial_date_v2 и домен переименован в
+          # partial_date; переименование домена sqlc не отслеживает
+          - db_type: partial_date_v2
+            go_type: kintion/server/internal/partialdate.Date
+          - db_type: partial_date_v2
+            nullable: true
+            go_type:
+              import: kintion/server/internal/partialdate
+              type: Date
+              pointer: true

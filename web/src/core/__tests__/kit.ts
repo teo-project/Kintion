@@ -3,7 +3,7 @@
 
 import { coreWords, messagesFor } from '@/i18n'
 
-import type { PartialDate } from '../dates'
+import { fromISO, type PartialDate } from '../dates'
 import { buildRegistry } from '../registry'
 import type { Ctx } from '../resolver'
 import type { EntityDef, ParticipantDTO, RecordDTO, SchemaDTO, TemplateDef, ValueDTO } from '../types'
@@ -88,6 +88,9 @@ export function records(schema: SchemaDTO, specs: RecSpec[]): Record<string, Rec
   return out
 }
 
-export function ctxOf(schema: SchemaDTO, specs: RecSpec[], today = '2026-10-11'): Ctx {
-  return { reg: buildRegistry(schema), records: records(schema, specs), words: coreWords(messagesFor('ru')), today }
+export function ctxOf(schema: SchemaDTO, specs: RecSpec[], today: string | PartialDate = '2026-10-11'): Ctx {
+  return {
+    reg: buildRegistry(schema), records: records(schema, specs), words: coreWords(messagesFor('ru')),
+    today: typeof today === 'string' ? fromISO(today) : today, eras: [], dateView: {},
+  }
 }

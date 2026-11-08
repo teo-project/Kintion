@@ -18,11 +18,7 @@ function keepDist(): Plugin {
   }
 }
 
-// демо-сборка (VITE_DEMO=1, src/demo): без сервера, с относительными путями
-const demo = process.env.VITE_DEMO === '1'
-
 export default defineConfig({
-  base: demo ? './' : '/',
   plugins: [vue(), keepDist()],
   resolve: {
     alias: {

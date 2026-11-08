@@ -112,7 +112,7 @@ function submit() {
   // пометка своего значения (F-104) — из значения, а не из прежней meta
   const rest = { ...draft.meta }
   delete rest[FREE_META]
-  const vin = valueIn(normalize(draft.value), rest)
+  const vin = valueIn(normalize(draft.value, props.def.type), rest)
   emit('save', {
     value: vin.value,
     valid_from: draft.from,

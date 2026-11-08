@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
 # Образ Kintion: сборка Vue → сборка Go со встроенным фронтендом → минимальный образ.
 # Контекст сборки — корень репозитория (см. compose.yml).
+# Фронтенд и Go собираются на платформе сборщика (Go — кросс-компиляцией под
+# TARGETARCH): многоплатформенный образ (CI, ghcr.io) не гоняет npm и go под эмуляцией.
 
-FROM node:24-alpine AS web
+FROM --platform=$BUILDPLATFORM node:24-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
@@ -10,8 +12,10 @@ COPY web/ ./
 COPY i18n/ /src/i18n/
 RUN npm run build
 
-FROM golang:1.27-alpine AS server
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS server
 ARG VERSION=dev
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -21,7 +25,7 @@ COPY server/ server/
 COPY web/embed.go web/
 COPY web/licenses/ web/licenses/
 COPY --from=web /src/web/dist/ web/dist/
-RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
       -ldflags "-s -w -X kintion/server/internal/version.Version=${VERSION}" \
       -o /out/kintion ./server/cmd/kintion \
  && mkdir -p /out/data

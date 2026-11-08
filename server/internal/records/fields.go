@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -171,7 +172,7 @@ func convert(d fieldDef, raw json.RawMessage, resolve resolver) (cols, error) {
 		return s, nil
 	}
 	switch d.Type {
-	case packs.TypeText, packs.TypePlace, packs.TypePhone, packs.TypeEmail, packs.TypeURL, packs.TypeContact:
+	case packs.TypeText, packs.TypePlace, packs.TypePhone, packs.TypeEmail, packs.TypeURL, packs.TypeContact, packs.TypeRichText:
 		s, err := str()
 		if err != nil {
 			return c, err
@@ -187,7 +188,7 @@ func convert(d fieldDef, raw json.RawMessage, resolve resolver) (cols, error) {
 			return c, invalid(key, "нет варианта %q", s)
 		}
 		c.text = &s
-	case packs.TypeImage:
+	case packs.TypeImage, packs.TypeFile:
 		s, err := str()
 		if err != nil {
 			return c, err
@@ -295,6 +296,9 @@ func metaOf(r *Rec, d fieldDef, c cols, meta map[string]json.RawMessage) ([]byte
 		if d.Type == packs.TypeChoice && d.Free {
 			allowed = append(slices.Clone(allowed), packs.FreeMeta) // F-104
 		}
+		if d.Type == packs.TypeFile {
+			allowed = append(slices.Clone(allowed), packs.FileMeta) // fileMeta
+		}
 		for _, k := range keys {
 			if !slices.Contains(allowed, k) {
 				return nil, invalid(d.Key, "неизвестный ключ meta %q", k)
@@ -302,6 +306,65 @@ func metaOf(r *Rec, d fieldDef, c cols, meta map[string]json.RawMessage) ([]byte
 		}
 	}
 	return json.Marshal(meta)
+}
+
+// fileInfo — сведения о файле поля file в meta (packs.FileMeta). Имя — от
+// клиента (имя при загрузке); тип, размер и наличие превью — из строки файла.
+type fileInfo struct {
+	Name    string `json:"name"`
+	MIME    string `json:"mime"`
+	Size    int64  `json:"size"`
+	Preview bool   `json:"preview"`
+}
+
+// fileMeta сверяет значение image и file с загруженным файлом дашборда
+// (KIN-27): image — только изображение с превью; file — любой файл, в meta —
+// имя (непустое, до 255 символов), тип и размер — по файлу, не по клиенту.
+func (t *Tx) fileMeta(d fieldDef, c cols, meta map[string]json.RawMessage) (map[string]json.RawMessage, error) {
+	if (d.Type != packs.TypeImage && d.Type != packs.TypeFile) || c.text == nil {
+		return meta, nil
+	}
+	f, err := t.q.GetFile(t.ctx, sqlc.GetFileParams{DashboardID: t.Dashboard, Sha256: *c.text})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, invalid(d.Key, "нет такого загруженного файла")
+	}
+	if err != nil {
+		return nil, err
+	}
+	// гость прикрепляет только видимый ему или загруженный им самим файл:
+	// известный хеш скрытого файла доступа не даёт (F-05, F-07)
+	if t.Guest() {
+		ok, err := t.FileVisible(*c.text)
+		if err == nil && !ok {
+			ok, err = t.q.AccountUploadedFile(t.ctx, sqlc.AccountUploadedFileParams{DashboardID: t.Dashboard, ActorID: t.guest, Sha256: *c.text})
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, invalid(d.Key, "нет такого загруженного файла")
+		}
+	}
+	if d.Type == packs.TypeImage {
+		if f.Width == nil || f.Height == nil {
+			return nil, invalid(d.Key, "это не изображение")
+		}
+		return meta, nil
+	}
+	var in struct {
+		Name *string `json:"name"`
+	}
+	if raw, ok := meta[packs.FileMeta]; !ok || json.Unmarshal(raw, &in) != nil ||
+		in.Name == nil || strings.TrimSpace(*in.Name) == "" || utf8.RuneCountInString(*in.Name) > 255 {
+		return nil, invalid(d.Key, "%s: нужно имя файла до 255 символов", packs.FileMeta)
+	}
+	raw, err := json.Marshal(fileInfo{Name: strings.TrimSpace(*in.Name), MIME: f.Mime, Size: f.Size, Preview: f.Width != nil})
+	if err != nil {
+		return nil, err
+	}
+	out := maps.Clone(meta)
+	out[packs.FileMeta] = raw
+	return out, nil
 }
 
 // valueRow — проверенное значение, готовое к записи.
@@ -344,6 +407,9 @@ func (t *Tx) checkValue(r *Rec, d fieldDef, in ValueIn, resolve resolver) (value
 	if err != nil {
 		return valueRow{}, err
 	}
+	if meta, err = t.fileMeta(d, c, meta); err != nil {
+		return valueRow{}, err
+	}
 	if c.meta, err = metaOf(r, d, c, meta); err != nil {
 		return valueRow{}, err
 	}
@@ -351,11 +417,46 @@ func (t *Tx) checkValue(r *Rec, d fieldDef, in ValueIn, resolve resolver) (value
 	if err != nil {
 		return valueRow{}, err
 	}
+	for _, x := range []struct {
+		f string
+		d *partialdate.Date
+	}{{d.Key, c.date}, {"valid_from", in.ValidFrom}, {"valid_to", in.ValidTo}} {
+		if err := t.checkEraYear(x.f, x.d, nil); err != nil {
+			return valueRow{}, err
+		}
+	}
 	return valueRow{cols: c, validFrom: in.ValidFrom, validTo: in.ValidTo, note: normText(in.Note), links: links}, nil
 }
 
 // single — у поля не больше одного значения: без истории и без multiple (F-11).
-func single(d fieldDef) bool { return !d.History && !d.Multiple }
+func single(d fieldDef) bool { return d.Field != nil && !d.History && !d.Multiple }
+
+// defOf — описание поля записи без блокировок (для чтения: общие поля — по
+// загруженному шаблону); нет поля — пустое описание.
+func defOf(r *Rec, key string) fieldDef {
+	switch {
+	case key == packs.StageKey:
+		return fieldDef{Field: &packs.Field{Key: key, Type: packs.TypeText, History: true}, stage: true}
+	case strings.HasPrefix(key, packs.CustomPrefix):
+		defs, _ := customDefs(r.Row.CustomFields)
+		for i := range defs {
+			if packs.CustomPrefix+defs[i].Key == key {
+				return fieldDef{Field: &defs[i]}
+			}
+		}
+	case strings.HasPrefix(key, packs.SharedPrefix):
+		for i := range r.Shared {
+			if packs.SharedPrefix+r.Shared[i].Key == key {
+				return fieldDef{Field: &r.Shared[i]}
+			}
+		}
+	default:
+		if f, ok := r.T.Field(key); ok {
+			return fieldDef{Field: f}
+		}
+	}
+	return fieldDef{}
+}
 
 // valueSnap — значение в журнале.
 type valueSnap struct {
@@ -483,6 +584,10 @@ func (t *Tx) AddValue(r *Rec, key string, in AddValue) (*Rec, error) {
 		return nil, err
 	}
 	if single(d) && len(list) > 0 {
+		// значение скрыто от гостя — поле для него «Задано» и не меняется (Q-50)
+		if slices.ContainsFunc(list, func(e sqlc.FieldEntry) bool { return t.Guest() && e.VRef != nil && t.seenLink(e.VRef) == nil }) {
+			return nil, ErrForbidden
+		}
 		return nil, invalid(key, "у поля одно значение — измените его")
 	}
 	v, err := t.checkValue(r, d, in.ValueIn, t.plainResolver)
@@ -537,7 +642,8 @@ func (t *Tx) bumped(r *Rec, key string) (*Rec, error) {
 // entry — значение vid поля key записи r.
 func (t *Tx) entry(r *Rec, key string, vid uuid.UUID) (sqlc.FieldEntry, error) {
 	e, err := t.q.GetFieldEntry(t.ctx, sqlc.GetFieldEntryParams{DashboardID: t.Dashboard, ID: vid})
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (e.EntityID != r.Row.ID || e.FieldKey != key)) {
+	// значение-ссылка на невидимую гостю запись ему не показывается — и не меняется
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (e.EntityID != r.Row.ID || e.FieldKey != key || (e.VRef != nil && !t.inScope(*e.VRef)))) {
 		return e, ErrNotFound
 	}
 	return e, err
@@ -598,6 +704,19 @@ func (t *Tx) PatchValue(r *Rec, key string, vid uuid.UUID, in PatchValue) (*Rec,
 		}
 		c.meta = old.Meta
 		v.cols = c
+		if err := t.checkEraYear(d.Key, c.date, old.VDate); err != nil {
+			return nil, err
+		}
+	}
+	if in.ValidFrom.Set {
+		if err := t.checkEraYear("valid_from", in.ValidFrom.V, old.ValidFrom); err != nil {
+			return nil, err
+		}
+	}
+	if in.ValidTo.Set {
+		if err := t.checkEraYear("valid_to", in.ValidTo.V, old.ValidTo); err != nil {
+			return nil, err
+		}
 	}
 	if in.Meta.Set || in.Value.Set {
 		meta := map[string]json.RawMessage{}
@@ -635,6 +754,9 @@ func (t *Tx) PatchValue(r *Rec, key string, vid uuid.UUID, in PatchValue) (*Rec,
 			byName = false
 		}
 		if meta, err = markFree(d, &v.cols, meta, byName); err != nil {
+			return nil, err
+		}
+		if meta, err = t.fileMeta(d, v.cols, meta); err != nil {
 			return nil, err
 		}
 		if v.meta, err = metaOf(r, d, v.cols, meta); err != nil {

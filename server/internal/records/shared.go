@@ -33,11 +33,14 @@ func sharedDefs(overrides []byte) ([]packs.Field, error) {
 type SharedPatch struct {
 	IfRev        *int64            `json:"if_rev"`
 	CustomFields []json.RawMessage `json:"custom_fields"`
+	// CustomSections — общие свои блоки шаблона (F-139); нет ключа — прежние.
+	CustomSections *[]json.RawMessage `json:"custom_sections"`
 }
 
-// sharedSnapshot — общие поля шаблона в журнале.
+// sharedSnapshot — общие поля и блоки шаблона в журнале.
 type sharedSnapshot struct {
-	CustomFields []json.RawMessage `json:"custom_fields"`
+	CustomFields   []json.RawMessage `json:"custom_fields"`
+	CustomSections []json.RawMessage `json:"custom_sections,omitempty"`
 }
 
 // PatchShared заменяет общие свои поля шаблона дашборда. Те же правила, что
@@ -65,7 +68,9 @@ func (t *Tx) PatchShared(tmplID uuid.UUID, p SharedPatch) (sqlc.DashboardTemplat
 		return sqlc.DashboardTemplate{}, err
 	}
 	if row.Rev != *p.IfRev {
-		return sqlc.DashboardTemplate{}, &ConflictError{Field: field, Current: map[string]any{"rev": row.Rev, SharedKey: old}}
+		return sqlc.DashboardTemplate{}, &ConflictError{Field: field, Current: map[string]any{
+			"rev": row.Rev, SharedKey: old, SectionsKey: rawList(sharedSectionsRaw(row.Overrides)),
+		}}
 	}
 	seen, err := t.checkCustomList(field, p.CustomFields)
 	if err != nil {
@@ -108,19 +113,28 @@ func (t *Tx) PatchShared(tmplID uuid.UUID, p SharedPatch) (sqlc.DashboardTemplat
 			return sqlc.DashboardTemplate{}, err
 		}
 	}
-	before := sharedSnapshot{CustomFields: rawList(ov[SharedKey])}
+	before := sharedSnapshot{CustomFields: rawList(ov[SharedKey]), CustomSections: rawList(ov[SectionsKey])}
+	sections := before.CustomSections
+	if p.CustomSections != nil {
+		sections = *p.CustomSections
+	}
+	if err := t.sharedSections(tm, tmplID, before.CustomSections, sections, p.CustomFields); err != nil {
+		return sqlc.DashboardTemplate{}, err
+	}
 	list := p.CustomFields
 	if list == nil {
 		list = []json.RawMessage{}
 	}
-	if len(list) == 0 {
-		delete(ov, SharedKey)
-	} else {
-		b, err := json.Marshal(list)
+	for k, l := range map[string][]json.RawMessage{SharedKey: list, SectionsKey: sections} {
+		if len(l) == 0 {
+			delete(ov, k)
+			continue
+		}
+		b, err := json.Marshal(l)
 		if err != nil {
 			return sqlc.DashboardTemplate{}, err
 		}
-		ov[SharedKey] = b
+		ov[k] = b
 	}
 	b, err := json.Marshal(ov)
 	if err != nil {
@@ -139,8 +153,68 @@ func (t *Tx) PatchShared(tmplID uuid.UUID, p SharedPatch) (sqlc.DashboardTemplat
 	t.tmpls[tmplID] = ntm
 	return nrow, t.op.Write(t.ctx, t.q, audit.Entry{
 		Dashboard: &t.Dashboard, Object: "dashboard_template", ObjectID: &tmplID, Op: audit.OpUpdate,
-		Before: before, After: sharedSnapshot{CustomFields: list},
+		Before: before, After: sharedSnapshot{CustomFields: list, CustomSections: sections},
 	})
+}
+
+// sharedSections — общие свои блоки шаблона (F-139): ключи не совпадают с
+// блоками шаблона; общие поля стоят в существующих блоках; блок, в котором
+// есть поля (общие или своих полей любой записи шаблона в дашборде, в том
+// числе в корзине), не удаляется. В 0.1 все записи дашборда видит владелец —
+// ответ не зависит от невидимого (F-07).
+func (t *Tx) sharedSections(tm *Tmpl, tmplID uuid.UUID, old, list, fields []json.RawMessage) error {
+	builtin := builtinSections(tm)
+	keys, err := checkSections(SectionsKey, list, builtin)
+	if err != nil {
+		return err
+	}
+	defs := make([]packs.Field, 0, len(fields))
+	for _, raw := range fields {
+		var f packs.Field
+		if err := json.Unmarshal(raw, &f); err != nil {
+			return invalid(SharedKey, "неверное описание поля: %v", err)
+		}
+		defs = append(defs, f)
+	}
+	oldKeys := make([]string, 0, len(old))
+	for _, raw := range old {
+		var s customSectionDef
+		if json.Unmarshal(raw, &s) == nil {
+			oldKeys = append(oldKeys, s.Key)
+		}
+	}
+	removed := minus(oldKeys, keys)
+	if err := checkFieldSections(SharedKey, defs, union(builtin, setOf(keys)), removed); err != nil {
+		return err
+	}
+	if added := minus(keys, oldKeys); len(added) > 0 {
+		own, err := t.q.ListRecordSectionKeysByTemplate(t.ctx, sqlc.ListRecordSectionKeysByTemplateParams{
+			DashboardID: t.Dashboard, TemplateID: tmplID,
+		})
+		if err != nil {
+			return err
+		}
+		for _, k := range added {
+			if slices.Contains(own, k) {
+				return invalid(SectionsKey, "ключ блока %q уже занят", k)
+			}
+		}
+	}
+	if len(removed) == 0 {
+		return nil
+	}
+	used, err := t.q.ListCustomSectionsByTemplate(t.ctx, sqlc.ListCustomSectionsByTemplateParams{
+		DashboardID: t.Dashboard, TemplateID: tmplID,
+	})
+	if err != nil {
+		return err
+	}
+	for _, k := range removed {
+		if slices.Contains(used, k) {
+			return invalid(SectionsKey, "в блоке %q есть поля: сначала перенесите или уберите их", k)
+		}
+	}
+	return nil
 }
 
 func rawList(raw json.RawMessage) []json.RawMessage {

@@ -8,7 +8,7 @@
 // самой записи (`.note`); `custom.<ключ>` — свободное поле (F-75);
 // `поле:свойство` — свойство описания поля, а не значения (`surname:name`).
 
-import { compareDates, formatDate, isEmptyDate, type PartialDate } from './dates'
+import { compareDates, formatDate, isEmptyDate, type DateView, type EraOrderLike, type PartialDate } from './dates'
 import { periodLabel, systemLabel, templateOf, type Registry, type Words } from './registry'
 import type {
   Condition, ConditionArg, FieldDef, GrammarElement, ParticipantDTO, PeriodDTO, RecordDTO, RoleDef, StageDef, TemplateDef, ValueDTO,
@@ -28,8 +28,15 @@ export interface Ctx {
   /** запись и связанные с ней (`related` ответа API) */
   records: Record<string, RecordDTO | undefined>
   words: Words
-  /** сегодня (ISO): «действующее» и `single` считаются на сегодня (Д-20) */
-  today: string
+  /**
+   * «Сегодня» (Д-20): «действующее», `single` и «прошлая связь» считаются на
+   * него; настоящая дата или текущий год мира дашборда (F-143)
+   */
+  today: PartialDate
+  /** хронологический порядок эр дашборда и эры с обратным счётом (F-143) */
+  eras: EraOrderLike
+  /** вид дат: показывать ли эру (F-143) */
+  dateView: DateView
 }
 
 /** Шаблон записи; нет — запись неактивного или незагруженного шаблона. */
@@ -126,7 +133,11 @@ export interface Item {
 }
 
 export function isDateLike(v: unknown): v is PartialDate {
-  return !!v && typeof v === 'object' && !Array.isArray(v) && ('y' in v || 'm' in v || 'd' in v)
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false
+  if ('y' in v || 'm' in v || 'd' in v) return true
+  // дата из одной эры (F-14): только ключ e — строка
+  const keys = Object.keys(v)
+  return keys.length === 1 && keys[0] === 'e' && typeof (v as { e: unknown }).e === 'string'
 }
 
 function isEmpty(v: unknown): boolean {
@@ -166,17 +177,35 @@ export function isFreeText(v: unknown): v is FreeText {
   return !!v && typeof v === 'object' && !Array.isArray(v) && typeof (v as FreeText).free === 'string' && Object.keys(v).length === 1
 }
 
-/** Хранимое значение с учётом пометки: своё — FreeText, прочее — как есть. */
+/** Ключ meta со сведениями о файле поля «Файл» (KIN-27). */
+export const FILE_META = 'file'
+
+/** Значение поля «Файл» в форме: sha256 и сведения из meta (имя, тип, размер). */
+export interface FileValue { sha256: string; name: string; mime?: string; size?: number; preview?: boolean }
+
+export function isFileValue(v: unknown): v is FileValue {
+  return !!v && typeof v === 'object' && typeof (v as FileValue).sha256 === 'string' && typeof (v as FileValue).name === 'string'
+}
+
+/** Хранимое значение с учётом meta: своё — FreeText, файл — FileValue, прочее — как есть. */
 export function storedRaw(v: { value: unknown; meta?: Record<string, unknown> | null }): unknown {
-  return v.meta?.[FREE_META] === true && typeof v.value === 'string' ? { free: v.value } : v.value
+  if (v.meta?.[FREE_META] === true && typeof v.value === 'string') return { free: v.value }
+  const f = v.meta?.[FILE_META] as Partial<FileValue> | undefined
+  if (f && typeof f === 'object' && typeof v.value === 'string' && typeof f.name === 'string') {
+    return { sha256: v.value, name: f.name, mime: f.mime, size: f.size, preview: f.preview }
+  }
+  return v.value
 }
 
 /**
  * Значение для API (F-104): своё — текст и пометка в meta (прочие ключи
- * прежней meta сохраняются); вариант и остальное — как есть, без meta.
+ * прежней meta сохраняются); файл — sha256 и сведения в meta (KIN-27);
+ * вариант и остальное — как есть, без meta.
  */
 export function valueIn(v: unknown, meta?: Record<string, unknown> | null): { value: unknown; meta?: Record<string, unknown> } {
-  return isFreeText(v) ? { value: v.free, meta: { ...(meta ?? {}), [FREE_META]: true } } : { value: v }
+  if (isFreeText(v)) return { value: v.free, meta: { ...(meta ?? {}), [FREE_META]: true } }
+  if (isFileValue(v)) return { value: v.sha256, meta: { ...(meta ?? {}), [FILE_META]: { name: v.name, mime: v.mime, size: v.size } } }
+  return { value: v }
 }
 
 /**
@@ -194,6 +223,7 @@ export function freeChoiceValue(def: Pick<FieldDef, 'options'>, text: string): s
 export function valueText(ctx: Ctx, def: Pick<FieldDef, 'type' | 'options'> | undefined, raw: unknown, depth = 0): string {
   if (isEmpty(raw)) return ''
   if (isFreeText(raw)) return raw.free // своё значение — текстом, не вариантом (F-104)
+  if (isFileValue(raw)) return raw.name
   switch (def?.type) {
     case 'choice':
       return def.options?.find(o => o.key === raw)?.name ?? String(raw)
@@ -209,7 +239,7 @@ export function valueText(ctx: Ctx, def: Pick<FieldDef, 'type' | 'options'> | un
 function storedText(ctx: Ctx, raw: unknown): string {
   if (isEmpty(raw)) return ''
   if (isFreeText(raw)) return raw.free
-  if (isDateLike(raw)) return formatDate(raw, ctx.words.dates)
+  if (isDateLike(raw)) return formatDate(raw, ctx.words.dates, ctx.dateView)
   if (typeof raw === 'object') return JSON.stringify(raw)
   return String(raw)
 }
@@ -288,8 +318,10 @@ export function evalAddress(ctx: Ctx, rec: RecordDTO, addr: string | Address, de
       vals = pickIndex(vals, a.index, !def.history && !def.multiple)
       for (const v of vals) {
         if (a.parts.length === 0) {
-          const raw = storedRaw(v)
-          push(raw, a.resolved ? valueText(ctx, def, raw, depth) : storedText(ctx, raw))
+          // файл (KIN-27): хранимое значение — sha256, @ — имя файла
+          const sv = storedRaw(v)
+          const raw = isFileValue(sv) ? sv.sha256 : sv
+          push(raw, a.resolved ? valueText(ctx, def, sv, depth) : storedText(ctx, raw))
         } else {
           const raw = valuePart(v, a.parts)
           push(raw, storedText(ctx, raw))
@@ -302,7 +334,7 @@ export function evalAddress(ctx: Ctx, rec: RecordDTO, addr: string | Address, de
       if (!p) return out
       // start / end — без истории: любой индекс → единственное значение.
       if (a.parts.length === 0) {
-        push(p.value, formatDate(p.value, ctx.words.dates))
+        push(p.value, formatDate(p.value, ctx.words.dates, ctx.dateView))
         return out
       }
       const [part] = a.parts
@@ -407,8 +439,8 @@ export function evalCondition(ctx: Ctx, rec: RecordDTO, c: Condition): boolean {
   let p: [unknown, unknown] | null
   if (c.eq !== undefined) return (p = pair(c.eq)) !== null && sameRaw(p[0], p[1])
   if (c.ne !== undefined) return (p = pair(c.ne)) !== null && !sameRaw(p[0], p[1])
-  if (c.gt !== undefined) return (p = pair(c.gt)) !== null && (order(p[0], p[1]) ?? 0) > 0
-  if (c.lt !== undefined) return (p = pair(c.lt)) !== null && (order(p[0], p[1]) ?? 0) < 0
+  if (c.gt !== undefined) return (p = pair(c.gt)) !== null && (order(ctx, p[0], p[1]) ?? 0) > 0
+  if (c.lt !== undefined) return (p = pair(c.lt)) !== null && (order(ctx, p[0], p[1]) ?? 0) < 0
   if (c.count !== undefined) return countValues(ctx, rec, c.count) > 0
   if (Array.isArray(c.all)) return c.all.every(x => evalCondition(ctx, rec, x))
   if (Array.isArray(c.any)) return c.any.some(x => evalCondition(ctx, rec, x))
@@ -470,9 +502,9 @@ function sorted(v: unknown): unknown {
 }
 
 /** Порядок для gt / lt: числа и частичные даты; прочее — несравнимо (undefined). */
-function order(a: unknown, b: unknown): number | undefined {
+function order(ctx: Ctx, a: unknown, b: unknown): number | undefined {
   if (typeof a === 'number' && typeof b === 'number') return a - b
-  if (isDateLike(a) && isDateLike(b) && !isEmptyDate(a) && !isEmptyDate(b)) return compareDates(a, b)
+  if (isDateLike(a) && isDateLike(b) && !isEmptyDate(a) && !isEmptyDate(b)) return compareDates(a, b, ctx.eras)
   return undefined
 }
 

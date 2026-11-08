@@ -9,6 +9,14 @@ func (t *Tx) createRest(b Batch, res *BatchResult, refs *batchRefs) error {
 	if err := t.createGroups(b, res); err != nil {
 		return err
 	}
+	// гость: созданное — в его технической группе, чтобы оставалось доступным на правку (F-149)
+	if t.Guest() {
+		for _, r := range res.Records {
+			if err := t.labelOwn(r.Row.ID); err != nil {
+				return err
+			}
+		}
+	}
 	for _, r := range res.Records {
 		if err := t.autoGroups(r); err != nil {
 			return err

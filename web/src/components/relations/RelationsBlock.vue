@@ -21,7 +21,8 @@ import KinIcon from '../KinIcon.vue'
 
 import CreateRelationDialog from '../participants/CreateRelationDialog.vue'
 
-const props = defineProps<{ relations: RelationView[]; dashboard: string }>()
+/** readonly — без создания связей (гость чужого дашборда, F-03) */
+const props = defineProps<{ relations: RelationView[]; dashboard: string; readonly?: boolean }>()
 
 const s = useRecord()
 
@@ -93,7 +94,7 @@ function created() {
         <KinIcon name="tree" />
       </RouterLink>
       <PopoverRoot
-        v-if="templates.length"
+        v-if="templates.length && !readonly"
         v-model:open="menuOpen"
       >
         <PopoverTrigger

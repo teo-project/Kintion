@@ -16,7 +16,9 @@ Everything is a record. Any record may **participate** in another and some may *
 
 - An account owns **dashboards**. A dashboard is a closed container of data: records of one dashboard never mix with another.
 - A **group** is a label inside a dashboard (family, work). Groups can be nested many-to-many and are used as filters in lists and in the tree. A group may add records **automatically by surname**: it holds a list of surnames, and every record that has any of them anywhere in its surname history (case-insensitive) joins the group; nothing is removed automatically.
-- Every record has a `sensitive` flag. It is stored from the first version; rules that use it arrive with sharing.
+- Owners grant view or edit access to groups, inherited through nested groups. The first dashboard invitation needs acceptance. Guests see only accessible records, links and files; their change log contains only their own actions. See [Sharing](sharing.md).
+- A guest’s right to create records is controlled separately through a dedicated group for their new records. Groups, templates, eras, deletion and access management remain with the owner.
+- The stored `sensitive` flag does not currently hide records or fields: the view mode without sensitive data is planned. Share groups accordingly.
 
 ## Records and tables
 
@@ -24,7 +26,9 @@ PostgreSQL holds a relational skeleton. Everything that is a link is a table wit
 
 | Table | Content |
 | --- | --- |
-| `account`, `session`, `bootstrap` | owner, sessions, one-time setup token |
+| `account`, `session`, `bootstrap` | accounts, sessions, one-time setup token |
+| `instance_invite` | one-use registration invitations, stored as token hashes |
+| `dashboard_member`, `grp_grant` | dashboard invitations, accepted guests and group permissions |
 | `dashboard`, `dashboard_template` | dashboards and the templates available in each |
 | `pack` | installed packs and their versions |
 | `entity` | records: entity and template, `start`/`end` (partial dates), note, manual caption, custom fields, soft-delete marks |
@@ -58,16 +62,19 @@ Validation errors in one field never fail the saving of the whole record.
 
 ### Field types
 
-`text`, `number`, `partial_date`, `bool`, `choice`, `ref`, `image`, `place`, `phone`, `email`, `url`, `contact`.
+`text`, `number`, `partial_date`, `bool`, `choice`, `ref`, `image`, `file`, `rich_text`, `place`, `phone`, `email`, `url`, `contact`.
 
 - `choice` may be "free": a value from the options **or your own**. An option is stored by key, a custom value by text with a mark in `meta`.
 - `place` is a data type, not an entity.
 - `image` values carry a separate crop per place of display (tree portrait, square, card).
+- `file` stores an uploaded attachment; for guests, downloading it requires access to a record that references it.
+- `rich_text` stores Markdown, renders a sanitized subset of HTML and offers an editing preview.
+- Custom fields can be placed in existing card sections or in custom sections scoped to one record or the dashboard template.
 - A record can also have **custom fields** (its own) and a template can have **shared custom fields** added to all records of that template in a dashboard.
 
 ## Partial dates
 
-A date is a composite type `(year, month, day)` where **each part may be missing**, as long as at least one is present:
+A date is a composite type `(year, month, day, era)` where **each part may be missing**, as long as at least one is present. The year is signed (negative means "before the era"; there is no year 0). The era is an optional label for another calendar ("AC" in *Game of Thrones*, "Mesozoic"); a date may consist of an era alone:
 
 | Entered | Stored |
 | --- | --- |
@@ -75,7 +82,7 @@ A date is a composite type `(year, month, day)` where **each part may be missing
 | `March 1985` | year and month |
 | `12 March` | day and month, year unknown |
 
-The year, the month and the day are entered separately. The database type is a domain over a composite type with a validity check (it knows that `29 February` is valid when the year is unknown or a leap year). The same rules are implemented in Go and in TypeScript and are tested against one shared set of cases. Ordering and "possibly earlier" operators are intentionally not defined yet.
+The year, the month and the day are entered separately. The database type is a domain over a composite type with a validity check (it knows that `29 February` is valid when the year is unknown or a leap year). The same rules are implemented in Go and in TypeScript and are tested against one shared set of cases. Dates sort by the era order set in the dashboard settings, then by the signed year (in an era counted backwards the larger year comes first), month and day. An era is currently stored only with a year or alone, not with a month or day without a year. "Possibly earlier" operators are not defined yet.
 
 ## Start and end
 
@@ -109,4 +116,4 @@ Each change-log row stores the operation (several rows of one operation are grou
 
 ## Deletion
 
-Deleting a record moves it to the **trash** (soft delete); it can be restored or purged for good. References to a purged record are cleaned up; a purge is itself logged.
+Only the dashboard owner can delete, restore or purge records in this version. Deleting a record moves it to the **trash** (soft delete); it can be restored or purged for good. References to a purged record are cleaned up; a purge is itself logged.

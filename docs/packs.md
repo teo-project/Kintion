@@ -77,10 +77,10 @@ A template whose id equals its entity id is the **default template**: a record i
 
 | Key | Meaning |
 | --- | --- |
-| `type` | `text`, `number`, `partial_date`, `bool`, `choice`, `ref`, `image`, `place`, `phone`, `email`, `url`, `contact` |
+| `type` | `text`, `number`, `partial_date`, `bool`, `choice`, `ref`, `image`, `file`, `rich_text`, `place`, `phone`, `email`, `url`, `contact` |
 | `history` | the value changes over time; the top one is current |
 | `multiple` | several values valid at once (phones) |
-| `section` | `main` or `additional` on the card |
+| `section` | section key on the card (`main`, `additional`, or a template-defined section) |
 | `show` | `always` (default) or `filled` — an empty field is hidden and added with "Add" |
 | `sensitive` | marks a sensitive field |
 | `surname` | this is the surname field of the record, used by groups that add records by surname |

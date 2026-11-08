@@ -43,6 +43,8 @@ export interface TreeOptions {
   depth: number
   /** «Скрыть умерших» (F-119) */
   hideDead?: boolean
+  /** люди, которых «Скрыть умерших» не прячет: переход по иконке дерева (F-136) */
+  reveal?: string[]
   /** ширина строки подписи 10px в пикселях (измерение в браузере); нет — оценка по числу символов */
   measure?: (text: string) => number
 }
@@ -391,8 +393,8 @@ function cut(g: Graph, rows: Map<string, number>, minRow: number): Graph {
  * отрезаются по графу связей, каждая связная группа оставшихся — одна развилка
  * `j:N` (точка — один человек или пара, «•••» — больше).
  */
-function collapse(g: Graph, rows: Map<string, number>): { g: Graph; rows: Map<string, number> } {
-  const dead = (id: string) => !!g.persons.get(id)?.dead
+function collapse(g: Graph, rows: Map<string, number>, reveal: string[] = []): { g: Graph; rows: Map<string, number> } {
+  const dead = (id: string) => !reveal.includes(id) && !!g.persons.get(id)?.dead
   const adj = new Map<string, Set<string>>()
   const vtx = (v: string) => adj.get(v) ?? adj.set(v, new Set()).get(v)!
   const link = (x: string, y: string) => {
@@ -521,7 +523,7 @@ export function layoutTree(input: TreeInput, opts: TreeOptions): TreeLayout {
   const maxRow = Math.max(...allRows.values())
   let g = cut(full, allRows, maxRow - Math.max(1, opts.depth) + 1)
   let rows = allRows
-  if (opts.hideDead) ({ g, rows } = collapse(g, allRows))
+  if (opts.hideDead) ({ g, rows } = collapse(g, allRows, opts.reveal))
   return place(g, new Map(rows), opts.measure)
 }
 
@@ -695,6 +697,26 @@ function place(g: Graph, rows: Map<string, number>, measure?: (text: string) => 
       const rr = mine(placed[i + 1]) ? placed[i + 1] : undefined
       if (l?.node && l.kind !== 'gap') edges.push({ id: `s:${l.node}>${it.node}`, type: 'straight', source: l.node, sourceHandle: 'r', target: it.node!, targetHandle: 'l', rels: [it.fam!.rel!] })
       if (rr?.node && rr.kind !== 'gap') edges.push({ id: `s:${it.node}>${rr.node}`, type: 'straight', source: it.node!, sourceHandle: 'r', target: rr.node, targetHandle: 'l', rels: [it.fam!.rel!] })
+      // пара из трёх и более (F-136): участник не рядом — линия к нему идёт под
+      // карточками между ними; under — их края, у которых линия уходит под карточку
+      const far = (from: number, step: 1 | -1) => {
+        for (let j = from; j >= 0 && j < placed.length; j += step) if (mine(placed[j]) && placed[j]!.node) return j
+        return -1
+      }
+      const under = (a: number, b: number) => placed.slice(a + 1, b)
+        .filter(n => n.node && (n.kind === 'person' || n.kind === 'ref'))
+        .map(n => {
+          const nd = nodes.find(x => x.id === n.node)!
+          return { node: nd.id, x0: nd.x, x1: nd.x + nd.w }
+        })
+      if (!l) {
+        const j = far(i - 2, -1)
+        if (j >= 0) edges.push({ id: `s:${placed[j]!.node}>${it.node}`, type: 'straight', source: placed[j]!.node!, sourceHandle: 'r', target: it.node!, targetHandle: 'l', rels: [it.fam!.rel!], under: under(j, i) })
+      }
+      if (!rr) {
+        const j = far(i + 2, 1)
+        if (j >= 0) edges.push({ id: `s:${it.node}>${placed[j]!.node}`, type: 'straight', source: it.node!, sourceHandle: 'r', target: placed[j]!.node!, targetHandle: 'l', rels: [it.fam!.rel!], under: under(i, j) })
+      }
     })
   }
 
@@ -831,13 +853,16 @@ function place(g: Graph, rows: Map<string, number>, measure?: (text: string) => 
     const mine = parent ? all.filter(r => r.parent === parent) : all
     return [...new Set((mine.length ? mine : all).map(r => r.id))]
   }
+  // ряд узла линии: узел пары и отсылка стоят в ряду, где их поставили, —
+  // не в ряду самого человека (отсылка на супруга из другого поколения)
+  const nodeRow = new Map(nodes.map(n => [n.id, n.row]))
   // линии к детям
   for (const f of ordered) {
     const kids = f.kids.filter(k => pos.has(k.id))
     if (!kids.length) continue
     const levels = new Map<number, number>()
     const busAt = (k: string) => levels.get(row(k)) ?? levels.set(row(k), nextBus(row(k))).get(row(k))!
-    const fromRow = Math.min(...[f.a, f.b].filter(Boolean).map(row))
+    const fromRow = nodeRow.get(famNode.get(f.id) ?? '') ?? Math.min(...[f.a, f.b].filter(Boolean).map(row))
     for (const k of kids) {
       const style = { dashed: k.dashed || undefined, label: k.label }
       const node = famNode.get(f.id)
@@ -848,7 +873,7 @@ function place(g: Graph, rows: Map<string, number>, measure?: (text: string) => 
       for (const p of [f.a, f.b]) {
         if (!p) continue
         const src = pos.has(p) ? p : refOf.get(`${f.id}:${p}`)
-        if (src) bus(`b:${f.id}:${p}>${k.id}`, src, k.id, busAt(k.id), row(p), row(k.id), { dashed: k.dashed || undefined, label: f.b ? undefined : k.label, group: f.id, rels: relsOf(k, p) })
+        if (src) bus(`b:${f.id}:${p}>${k.id}`, src, k.id, busAt(k.id), nodeRow.get(src) ?? row(p), row(k.id), { dashed: k.dashed || undefined, label: f.b ? undefined : k.label, group: f.id, rels: relsOf(k, p) })
       }
     }
   }
@@ -888,5 +913,110 @@ function place(g: Graph, rows: Map<string, number>, measure?: (text: string) => 
     usedX.push(best)
     b.edge.via = { x: best, y: rowY(b.fromRow + 1) - 62 }
   }
-  return { nodes, edges }
+  return joinUnions({ nodes, edges })
+}
+
+/** шаг высот дуг пары из трёх и более над плашкой и шаг их выходов вдоль её верха (F-136) */
+const ARC_STEP = 12
+const ARC_OUT = 6
+/** спуск дуги к боку участника: не короче и не длиннее */
+const ARC_D_MIN = 12
+const ARC_D_MAX = 48
+
+/**
+ * Пара из трёх и более (F-136): у отношения одна плашка — та, что раскладка
+ * поставила для первой пары (остальные убираются). От неё — линии ко всем
+ * участникам: к соседям прямые, к остальным дуги над серединой фото, у каждой
+ * своя высота (дальше — выше), под карточками между ними. Линии детей — от
+ * плашки; наведение на линию ребёнка зажигает линии к его родителям из пары.
+ */
+export function joinUnions(l: TreeLayout): TreeLayout {
+  const groups = new Map<string, TreeNode[]>()
+  for (const n of l.nodes) if (n.type === 'union' && n.relation) (groups.get(n.relation) ?? groups.set(n.relation, []).get(n.relation)!).push(n)
+  const byNode = new Map(l.nodes.map(n => [n.id, n]))
+  const drop = new Set<string>()
+  const edges = [...l.edges]
+  /** участники узла отношения — другие концы его прямых линий */
+  const ends = (u: string) => edges.filter(e => e.type === 'straight' && (e.source === u || e.target === u)).map(e => (e.source === u ? e.target : e.source))
+  const arcs: { e: TreeEdge; p: TreeNode; x: TreeNode; a: number; b: number; right: boolean }[] = []
+  /** горизонталь линий детей плашки: одна на ряд детей, как у обычной пары */
+  const busY = new Map<string, number>()
+  for (const [rel, us] of groups) {
+    if (us.length < 2) continue
+    const p = us.find(u => u.id === rel) ?? us[0]!
+    p.joint = true
+    const lineTo = new Map<string, string>()
+    const pc = p.x + p.w / 2
+    const arcTo = (e: TreeEdge, x: TreeNode) => {
+      const right = x.x > p.x
+      arcs.push({ e, p, x, right, a: right ? pc : x.x + x.w, b: right ? x.x : pc })
+    }
+    for (const e of edges) {
+      if (e.type !== 'straight' || (e.source !== p.id && e.target !== p.id)) continue
+      const id = e.source === p.id ? e.target : e.source
+      lineTo.set(id, e.id)
+      // участник первой пары не рядом с плашкой — тоже дугой
+      const x = byNode.get(id)
+      if (e.under?.length && x) arcTo(e, x)
+    }
+    const partsOf = new Map(us.map(u => [u.id, ends(u.id)]))
+    for (const u of us) {
+      if (u === p) continue
+      drop.add(u.id)
+      for (const id of partsOf.get(u.id)!) {
+        const x = byNode.get(id)
+        if (!x || lineTo.has(id)) continue
+        const right = x.x > p.x
+        const e: TreeEdge = right
+          ? { id: `s:${p.id}>${id}`, type: 'straight', source: p.id, sourceHandle: 'r', target: id, targetHandle: 'l', rels: [rel] }
+          : { id: `s:${id}>${p.id}`, type: 'straight', source: id, sourceHandle: 'r', target: p.id, targetHandle: 'l', rels: [rel] }
+        edges.push(e)
+        lineTo.set(id, e.id)
+        arcTo(e, x)
+      }
+    }
+    for (const e of edges) {
+      if (e.type !== 'bus' || !partsOf.has(e.source)) continue
+      e.lines = partsOf.get(e.source)!.map(id => lineTo.get(id)).filter((id): id is string => !!id)
+      e.source = p.id
+      const key = `${p.id}|${byNode.get(e.target)?.row}`
+      if (e.busY !== undefined) e.busY = busY.get(key) ?? busY.set(key, e.busY).get(key)!
+    }
+  }
+  if (!drop.size) return l
+  // высоты дуг: по рядам, перекрывающиеся по x — на разных; короткая — ниже длинной
+  const levels = new Map<TreeEdge, number>()
+  arcs.sort((m, n) => m.b - m.a - (n.b - n.a) || (m.e.id < n.e.id ? -1 : 1))
+  for (const c of arcs) {
+    const used = new Set(arcs.filter(o => levels.has(o.e) && o.p.row === c.p.row && o.a < c.b && c.a < o.b).map(o => levels.get(o.e)!))
+    let k = 1
+    while (used.has(k)) k++
+    levels.set(c.e, k)
+  }
+  const rowNodes = (r: number) => l.nodes.filter(n => n.row === r && !drop.has(n.id) && (n.type === 'person' || n.type === 'ref' || (n.type === 'dot' && n.person)))
+  for (const c of arcs) {
+    const { p, x, right } = c
+    const k = levels.get(c.e)!
+    // выход сверху плашки: выше дуга — ближе к середине (дуги одной стороны вложены, не пересекаются);
+    // много дуг — шаг меньше, чтобы выходы не слились
+    const side = arcs.filter(o => o.p === p && o.right === right)
+    const rank = side.filter(o => levels.get(o.e)! > k).length
+    const out = 3 + Math.min(ARC_OUT, (p.w / 2 - 5) / Math.max(1, side.length - 1)) * rank
+    const top = p.y
+    const row = rowNodes(p.row)
+    // не выше верха карточек ряда: много уровней — шаг высот меньше, высоты остаются разными
+    const room = top - Math.min(top - ARC_STEP, ...row.filter(n => n.type !== 'dot').map(n => n.y + 4))
+    const maxK = Math.max(...arcs.filter(o => o.p.row === p.row).map(o => levels.get(o.e)!))
+    const y = top - Math.min(ARC_STEP, room / maxK) * k
+    const between = row.filter(n => n !== x && n.x + n.w / 2 > c.a && n.x + n.w / 2 < c.b)
+    const gap = right
+      ? x.x - Math.max(p.x + p.w, ...between.map(n => n.x + n.w))
+      : Math.min(p.x, ...between.map(n => n.x)) - (x.x + x.w)
+    c.e.arc = { x: p.x + p.w / 2 + (right ? out : -out), top, y, d: Math.max(ARC_D_MIN, Math.min(ARC_D_MAX, gap)), at: right ? 'source' : 'target' }
+    c.e.under = between.filter(n => n.type !== 'dot').sort((m, n) => m.x - n.x).map(n => ({ node: n.id, x0: n.x, x1: n.x + n.w }))
+  }
+  return {
+    nodes: l.nodes.filter(n => !drop.has(n.id)),
+    edges: edges.filter(e => !drop.has(e.source) && !drop.has(e.target)),
+  }
 }

@@ -54,7 +54,7 @@ func isRed(c color.Color) bool {
 func TestPutOrientationPreview(t *testing.T) {
 	s := &Store{Root: t.TempDir(), MaxBytes: 1 << 20}
 	data := withOrientation(t, halves(), 6)
-	info, err := s.Put(bytes.NewReader(data))
+	info, err := s.Put(bytes.NewReader(data), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,18 +89,47 @@ func TestPutOrientationPreview(t *testing.T) {
 		t.Fatalf("preview %v, center %v", img.Bounds(), img.At(32, 32))
 	}
 	// повторная загрузка — тот же файл
-	again, err := s.Put(bytes.NewReader(data))
+	again, err := s.Put(bytes.NewReader(data), false)
 	if err != nil || again != info {
 		t.Fatalf("again %+v %v", again, err)
 	}
 }
 
+// Любой файл (поле file, KIN-27): тип — по содержимому, без размеров; битое
+// изображение — файл без превью; предел размера — тот же.
+func TestPutAnyType(t *testing.T) {
+	s := &Store{Root: t.TempDir(), MaxBytes: 1024}
+	info, err := s.Put(strings.NewReader("%PDF-1.4 документ"), true)
+	if err != nil || info.MIME != "application/pdf" || info.Width != 0 || info.Height != 0 {
+		t.Fatalf("pdf: %+v %v", info, err)
+	}
+	if _, err := os.Stat(s.Path(info.SHA256)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Put(bytes.NewReader(make([]byte, 2048)), true); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("large: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, halves(), nil); err != nil {
+		t.Fatal(err)
+	}
+	s.MaxBytes = 1 << 20
+	info, err = s.Put(bytes.NewReader(buf.Bytes()[:buf.Len()/2]), true)
+	if err != nil || info.MIME != "image/jpeg" || info.Width != 0 {
+		t.Fatalf("truncated: %+v %v", info, err)
+	}
+	info, err = s.Put(bytes.NewReader(buf.Bytes()), true)
+	if err != nil || info.Width == 0 {
+		t.Fatalf("image: %+v %v", info, err)
+	}
+}
+
 func TestPutRejects(t *testing.T) {
 	s := &Store{Root: t.TempDir(), MaxBytes: 1024}
-	if _, err := s.Put(strings.NewReader("просто текст")); !errors.Is(err, ErrUnsupported) {
+	if _, err := s.Put(strings.NewReader("просто текст"), false); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("text: %v", err)
 	}
-	if _, err := s.Put(bytes.NewReader(make([]byte, 2048))); !errors.Is(err, ErrTooLarge) {
+	if _, err := s.Put(bytes.NewReader(make([]byte, 2048)), false); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("large: %v", err)
 	}
 	// цел заголовок, обрезаны данные
@@ -108,7 +137,7 @@ func TestPutRejects(t *testing.T) {
 	if err := jpeg.Encode(&buf, halves(), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Put(bytes.NewReader(buf.Bytes()[:buf.Len()/2])); !errors.Is(err, ErrUnsupported) {
+	if _, err := s.Put(bytes.NewReader(buf.Bytes()[:buf.Len()/2]), false); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("truncated: %v", err)
 	}
 }
@@ -161,7 +190,7 @@ func TestParsePreview(t *testing.T) {
 // пропорциях обрезки, большая сторона — size.
 func TestRectPreview(t *testing.T) {
 	s := &Store{Root: t.TempDir(), MaxBytes: 1 << 20}
-	info, err := s.Put(bytes.NewReader(withOrientation(t, halves(), 6))) // 16×32
+	info, err := s.Put(bytes.NewReader(withOrientation(t, halves(), 6)), false) // 16×32
 	if err != nil {
 		t.Fatal(err)
 	}

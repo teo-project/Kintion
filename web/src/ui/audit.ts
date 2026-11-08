@@ -50,11 +50,12 @@ const PARTICIPATION = 'participation'
 const GROUP = 'grp'
 const GROUP_LINK = 'grp_link'
 const LABEL = 'entity_group'
+const DASHBOARD = 'dashboard'
 
 /** Системные колонки записи и их ключи подписей (план §4). */
 const ENTITY_KEYS: [string, string][] = [
   ['start_date', 'start'], ['start_link', 'start'], ['end_date', 'end'], ['end_link', 'end'],
-  ['note', 'note'], ['title_manual', 'title'], ['sensitive', 'sensitive'], ['custom_fields', ''],
+  ['note', 'note'], ['title_manual', 'title'], ['sensitive', 'sensitive'], ['custom_fields', ''], ['custom_sections', ''],
 ]
 
 /** Части значения поля, кроме самого значения. */
@@ -70,13 +71,14 @@ function moved(a: AuditCtx, label: string, what: string, before: unknown, after:
   return { label, before: '', after: `${what} ${up ? '↑' : '↓'} ${up ? a.m.history.moveUp : a.m.history.moveDown}` }
 }
 
-/** Описание своего поля для журнала: название, тип, история, несколько значений. */
-function customText(a: AuditCtx, v: unknown): string {
+/** Описание своего поля для журнала: название, тип, история, несколько значений, блок (F-139). */
+function customText(a: AuditCtx, v: unknown, section: (key: string) => string = k => k): string {
   if (!Array.isArray(v)) return ''
   const types = a.m.custom.types as Record<string, string | undefined>
   return v.map(x => {
     const f = x as FieldDef
-    const props = [types[f.type] ?? f.type, f.history ? a.m.custom.history : '', f.multiple ? a.m.custom.multiple : '']
+    const props = [types[f.type] ?? f.type, f.history ? a.m.custom.history : '', f.multiple ? a.m.custom.multiple : '',
+      f.section ? `${a.m.custom.section}: ${section(f.section)}` : '']
     return `${f.name} (${props.filter(Boolean).join(', ')})`
   }).join('; ')
 }
@@ -116,7 +118,9 @@ export function auditCtx(ctx: Ctx, m: Messages, ops: AuditOperationDTO[], groups
       if (typeof tid === 'string') templates.set(e.entity_id, tid)
     }
   }
-  return { ctx, m, groups: new Map(groups.map(g => [g.id, g])), templates, purged }
+  // журнал подробный (F-16): эра видна всегда, даже если в дашборде её не показывают
+  const shown: Ctx = { ...ctx, dateView: { ...ctx.dateView, showEra: true } }
+  return { ctx: shown, m, groups: new Map(groups.map(g => [g.id, g])), templates, purged }
 }
 
 function recordOf(a: AuditCtx, id: string | null | undefined): RecordDTO | undefined {
@@ -146,7 +150,7 @@ function purgedTitle(a: AuditCtx, id: string): string {
 function plain(a: AuditCtx, v: unknown): string {
   if (v == null || v === '') return ''
   if (typeof v === 'boolean') return v ? a.ctx.words.yes : a.ctx.words.no
-  if (isDateLike(v)) return formatDate(v as PartialDate, a.ctx.words.dates)
+  if (isDateLike(v)) return formatDate(v as PartialDate, a.ctx.words.dates, a.ctx.dateView)
   if (typeof v === 'object') return JSON.stringify(v)
   return String(v)
 }
@@ -156,6 +160,11 @@ function entityChanges(a: AuditCtx, e: AuditEntryDTO): Change[] {
   const entity = tpl?.entity ?? (e.after ?? e.before)?.entity as string | undefined
   const b: Snap = e.before ?? {}
   const af: Snap = e.after ?? {}
+  // название блока своего поля (F-139): блок шаблона, блоки из того же снимка
+  // (как назывался тогда), затем нынешние блоки записи и общие блоки шаблона
+  const now = [...(recordOf(a, e.entity_id)?.custom_sections ?? []), ...(tpl?.custom_sections ?? [])]
+  const sectionName = (snap: Snap) => (k: string) => a.ctx.words.sections[k]
+    ?? [...((snap.custom_sections ?? []) as { key: string; name: string }[]), ...now].find(x => x.key === k)?.name ?? k
   const out: Change[] = []
   for (const [col, key] of ENTITY_KEYS) {
     if (same(b[col], af[col])) continue
@@ -164,12 +173,13 @@ function entityChanges(a: AuditCtx, e: AuditEntryDTO): Change[] {
     if (key === 'start' || key === 'end') label = (tpl && periodLabel(a.ctx.reg, tpl, key, a.ctx.words)) || schemaLabel(a.m, ENTITY, col)
     else if (key) label = systemLabel(a.ctx.reg, entity, key, a.ctx.words)
     else label = schemaLabel(a.m, ENTITY, col)
-    const text = (v: unknown) => {
+    const text = (v: unknown, snap: Snap) => {
       if (col.endsWith('_link')) return titleOf(a, v)
-      if (col === 'custom_fields') return customText(a, v)
+      if (col === 'custom_fields') return customText(a, v, sectionName(snap))
+      if (col === 'custom_sections') return Array.isArray(v) ? v.map(x => String((x as { name?: unknown }).name ?? '')).join('; ') : ''
       return plain(a, v)
     }
-    out.push({ label, before: text(b[col]), after: text(af[col]) })
+    out.push({ label, before: text(b[col], b), after: text(af[col], af) })
   }
   return out
 }
@@ -275,6 +285,42 @@ function labelChanges(a: AuditCtx, e: AuditEntryDTO): Change[] {
 }
 
 /** Строка журнала для показа. */
+/** Эра для показа: пустая — «н. э.» при пустой эре по умолчанию def, иначе «без эры» (F-143). */
+function eraText(a: AuditCtx, e: unknown, def: unknown): string {
+  if (typeof e === 'string' && e !== '') return e
+  return typeof def === 'string' && def !== '' ? a.m.dashboard.eraNone : a.m.dashboard.eraOurs
+}
+
+/**
+ * Эры дашборда (F-143): правка настроек; замена эры в датах — отдельная
+ * запись с числом изменённых дат.
+ */
+function dashboardChanges(a: AuditCtx, e: AuditEntryDTO): Change[] {
+  const b = e.before ?? {}
+  const af = e.after ?? {}
+  const out: Change[] = []
+  const d = a.m.dashboard
+  const rep = af.replace as { from?: string; to?: string; changed?: number; default_before?: string; default_after?: string } | undefined
+  if (rep) out.push({ label: fmt(d.erasReplaced, { n: String(rep.changed ?? 0) }), before: eraText(a, rep.from, rep.default_before), after: eraText(a, rep.to, rep.default_after) })
+  if (!af.eras) return out
+  const eb = (b.eras ?? {}) as Snap
+  const ea = af.eras as Snap
+  const yesNo = (v: unknown) => (v ? a.ctx.words.yes : a.ctx.words.no)
+  const before = (x: unknown) => eraText(a, x, eb.default)
+  const after = (x: unknown) => eraText(a, x, ea.default)
+  if (!same(!!eb.show, !!ea.show)) out.push({ label: d.eraShow, before: yesNo(eb.show), after: yesNo(ea.show) })
+  if (!same(!!eb.edit, !!ea.edit)) out.push({ label: d.eraEdit, before: yesNo(eb.edit), after: yesNo(ea.edit) })
+  if (!same(eb.default ?? '', ea.default ?? '')) out.push({ label: d.eraDefault, before: before(eb.default), after: after(ea.default) })
+  const order = (v: unknown, era: (x: unknown) => string) => (Array.isArray(v) ? v.map(era).join(' → ') : '')
+  if (!same(eb.order ?? [], ea.order ?? [])) out.push({ label: d.eraOrder, before: order(eb.order, before), after: order(ea.order, after) })
+  if (!same(eb.today ?? null, ea.today ?? null)) out.push({ label: d.eraToday, before: plain(a, eb.today ?? ''), after: plain(a, ea.today ?? '') })
+  // годы эр: «AC: 1 … 400»; пустые — не показываются
+  const years = (v: unknown, era: (x: unknown) => string) => Object.entries((v ?? {}) as Record<string, { min?: number | null; max?: number | null }>)
+    .map(([k, y]) => `${era(k)}: ${y.min ?? ''} … ${y.max ?? ''}`).sort().join(', ')
+  if (years(eb.years, before) !== years(ea.years, after)) out.push({ label: d.eraYears, before: years(eb.years, before), after: years(ea.years, after) })
+  return out
+}
+
 export function entryView(a: AuditCtx, e: AuditEntryDTO): EntryView {
   let changes: Change[]
   switch (e.object) {
@@ -284,6 +330,7 @@ export function entryView(a: AuditCtx, e: AuditEntryDTO): EntryView {
     case GROUP: changes = groupChanges(a, e); break
     case GROUP_LINK: changes = groupLinkChanges(a, e); break
     case LABEL: changes = labelChanges(a, e); break
+    case DASHBOARD: changes = dashboardChanges(a, e); break
     default: changes = []
   }
   const ops = a.m.audit.ops as Record<string, string | undefined>
@@ -296,6 +343,20 @@ export function entryView(a: AuditCtx, e: AuditEntryDTO): EntryView {
     op: ops[e.op] ?? e.op,
     changes,
   }
+}
+
+/** Предел показа значения в журнале без разворота, символов. */
+export const CLIP = 200
+
+/**
+ * Начало длинного значения (форматированный текст, F-141): до CLIP символов
+ * и не больше трёх строк, с многоточием; короткое — как есть.
+ */
+export function clipText(s: string): string {
+  const lines = s.split('\n')
+  let out = lines.length > 3 ? lines.slice(0, 3).join('\n') : s
+  if (out.length > CLIP) out = out.slice(0, CLIP).trimEnd()
+  return out === s ? s : `${out.trimEnd()}…`
 }
 
 export function operationView(a: AuditCtx, o: AuditOperationDTO): OperationView {

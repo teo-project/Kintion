@@ -30,7 +30,7 @@ func (q *Queries) DeleteEntryLink(ctx context.Context, id uuid.UUID) error {
 }
 
 const listEntitiesLinkingTo = `-- name: ListEntitiesLinkingTo :many
-SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by FROM entity WHERE (start_link = $1::uuid OR end_link = $1::uuid) AND id <> $1::uuid ORDER BY id
+SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections FROM entity WHERE (start_link = $1::uuid OR end_link = $1::uuid) AND id <> $1::uuid ORDER BY id
 `
 
 func (q *Queries) ListEntitiesLinkingTo(ctx context.Context, target uuid.UUID) ([]Entity, error) {
@@ -60,6 +60,7 @@ func (q *Queries) ListEntitiesLinkingTo(ctx context.Context, target uuid.UUID) (
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.DeletedBy,
+			&i.CustomSections,
 		); err != nil {
 			return nil, err
 		}
@@ -194,7 +195,7 @@ func (q *Queries) ListRefEntriesTo(ctx context.Context, target uuid.UUID) ([]Fie
 }
 
 const restoreEntity = `-- name: RestoreEntity :one
-UPDATE entity SET deleted_at = NULL, deleted_by = NULL, updated_at = now() WHERE id = $1 RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by
+UPDATE entity SET deleted_at = NULL, deleted_by = NULL, updated_at = now() WHERE id = $1 RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections
 `
 
 func (q *Queries) RestoreEntity(ctx context.Context, id uuid.UUID) (Entity, error) {
@@ -218,12 +219,13 @@ func (q *Queries) RestoreEntity(ctx context.Context, id uuid.UUID) (Entity, erro
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.CustomSections,
 	)
 	return i, err
 }
 
 const setEntityDeleted = `-- name: SetEntityDeleted :one
-UPDATE entity SET deleted_at = now(), deleted_by = $2, updated_at = now() WHERE id = $1 RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by
+UPDATE entity SET deleted_at = now(), deleted_by = $2, updated_at = now() WHERE id = $1 RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections
 `
 
 type SetEntityDeletedParams struct {
@@ -252,6 +254,7 @@ func (q *Queries) SetEntityDeleted(ctx context.Context, arg SetEntityDeletedPara
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.CustomSections,
 	)
 	return i, err
 }

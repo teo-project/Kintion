@@ -3,7 +3,7 @@
 // только явно — наследования от формы роли нет (F-74); событие с
 // `period.end: null` — мгновенное (F-70); этап на дату не считается (Q-03).
 
-import { lo, hi, isEmptyDate, type PartialDate } from './dates'
+import { compareKeys, hiKey, isEmptyDate, loKey, type PartialDate } from './dates'
 import { isInstant } from './registry'
 import { isFreeText, rawValue, STAGE, storedRaw, tplOf, valuesOf, type Ctx } from './resolver'
 import type { FieldDef, Forms, OptionDef, RecordDTO, StageDef } from './types'
@@ -63,13 +63,19 @@ export function roleLabel(ctx: Ctx, rel: RecordDTO, roleKey: string, participant
   return forms ? pickForm(ctx, forms, ctx.records[participantId]) : roleKey
 }
 
-/** Идёт ли период на дату today: начался и не закончился (нет конца — идёт). */
-function within(today: string, from: PartialDate | null | undefined, to: PartialDate | null | undefined): boolean {
-  const start = isEmptyDate(from) ? null : lo(from)
-  if (start != null && start > today) return false
+/**
+ * Идёт ли период «сегодня»: начался и не закончился (нет конца — идёт).
+ * Сравнение — по месту эры и году (F-143); «сегодня» без месяца и дня (год
+ * мира) — промежуток: начался — не позже его конца, закончился — не позже начала.
+ */
+function within(ctx: Ctx, from: PartialDate | null | undefined, to: PartialDate | null | undefined): boolean {
+  const tLo = loKey(ctx.today, ctx.eras) ?? ''
+  const tHi = hiKey(ctx.today, ctx.eras) ?? ''
+  const start = isEmptyDate(from) ? null : loKey(from, ctx.eras)
+  if (start != null && compareKeys(start, tHi) > 0) return false
   if (isEmptyDate(to)) return true
-  const end = lo(to)
-  return end != null && end > today
+  const end = loKey(to, ctx.eras)
+  return end != null && compareKeys(end, tLo) > 0
 }
 
 /**
@@ -79,16 +85,17 @@ function within(today: string, from: PartialDate | null | undefined, to: Partial
 export function activeToday(
   ctx: Ctx, rec: RecordDTO, part?: { valid_from: PartialDate | null; valid_to: PartialDate | null },
 ): boolean {
-  const today = ctx.today
-  if (part && !within(today, part.valid_from, part.valid_to)) return false
+  if (part && !within(ctx, part.valid_from, part.valid_to)) return false
   if (flagEnded(ctx, rec)) return false
   if (isInstant(ctx.reg, tplOf(ctx, rec))) {
     const d = rec.start?.value
-    const l = lo(d)
-    const h = hi(d)
-    return l != null && h != null && l <= today && today <= h
+    const l = loKey(d, ctx.eras)
+    const h = hiKey(d, ctx.eras)
+    const tLo = loKey(ctx.today, ctx.eras)
+    const tHi = hiKey(ctx.today, ctx.eras)
+    return l != null && h != null && tLo != null && tHi != null && compareKeys(l, tHi) <= 0 && compareKeys(tLo, h) <= 0
   }
-  return within(today, rec.start?.value, rec.end?.value)
+  return within(ctx, rec.start?.value, rec.end?.value)
 }
 
 /**

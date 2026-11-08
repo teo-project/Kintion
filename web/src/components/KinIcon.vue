@@ -7,9 +7,16 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Calendar,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   Crop,
+  Download,
+  ExternalLink,
+  File,
   Github,
   History,
   Link,
@@ -29,6 +36,8 @@ import {
   Upload,
   User,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-vue-next'
 
 const ICONS = {
@@ -58,6 +67,15 @@ const ICONS = {
   tree: Network,
   lock: Lock,
   github: Github,
+  file: File,
+  download: Download,
+  external: ExternalLink,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  calendar: Calendar,
+  prev: ChevronLeft,
+  next: ChevronRight,
+  chevronUp: ChevronUp,
 } as const
 
 export type IconName = keyof typeof ICONS

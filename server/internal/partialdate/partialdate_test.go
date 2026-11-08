@@ -2,8 +2,10 @@ package partialdate_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,16 +26,22 @@ type Cases struct {
 		Why  string          `json:"why"`
 	} `json:"invalid"`
 	Age []struct {
-		Date json.RawMessage `json:"date"`
-		At   string          `json:"at"`
-		Age  *int            `json:"age"`
+		Date     json.RawMessage `json:"date"`
+		At       json.RawMessage `json:"at"`
+		Age      *int            `json:"age"`
+		Reversed bool            `json:"reversed"`
 	} `json:"age"`
 	Anniversary []struct {
 		Date json.RawMessage `json:"date"`
 		From string          `json:"from"`
 		Next *string         `json:"next"`
 	} `json:"anniversary"`
-	Sorted []json.RawMessage `json:"sorted"`
+	Sorted     []json.RawMessage `json:"sorted"`
+	SortedEras struct {
+		Eras     []string          `json:"eras"`
+		Reversed []string          `json:"reversed"`
+		Dates    []json.RawMessage `json:"dates"`
+	} `json:"sorted_eras"`
 }
 
 func loadCases(t *testing.T) Cases {
@@ -71,7 +79,13 @@ func fmtDate(v time.Time, ok bool) *string {
 	if !ok {
 		return nil
 	}
-	s := v.Format(time.DateOnly)
+	// время — астрономический год; в кейсах — год даты со знаком (−1 — 1 г. до н. э.)
+	y := partialdate.YearOf(v)
+	sign := ""
+	if y < 0 {
+		sign, y = "-", -y
+	}
+	s := fmt.Sprintf("%s%04d-%02d-%02d", sign, y, int(v.Month()), v.Day())
 	return &s
 }
 
@@ -98,7 +112,7 @@ func TestValid(t *testing.T) {
 		if got := fmtDate(d.Exact()); !eq(got, c.Exact) {
 			t.Errorf("%s exact = %v, want %v", c.Date, show(got), show(c.Exact))
 		}
-		if got := d.SortKey(); got != c.SortKey {
+		if got := d.SortKey(partialdate.EraOrder{}); got != c.SortKey {
 			t.Errorf("%s sort key = %q, want %q", c.Date, got, c.SortKey)
 		}
 		// JSON туда и обратно
@@ -132,7 +146,7 @@ func TestInvalid(t *testing.T) {
 	if _, err := (partialdate.Date{}).Value(); err == nil {
 		t.Error("empty date written to db")
 	}
-	if err := d.Scan("(,,)"); err == nil {
+	if err := d.Scan("(,,,)"); err == nil {
 		t.Error("empty date scanned")
 	}
 }
@@ -140,7 +154,7 @@ func TestInvalid(t *testing.T) {
 func TestAge(t *testing.T) {
 	for _, c := range loadCases(t).Age {
 		d := parse(t, c.Date)
-		age, ok := d.AgeAt(day(t, c.At))
+		age, ok := d.AgeAt(parse(t, c.At), c.Reversed)
 		var got *int
 		if ok {
 			got = &age
@@ -160,23 +174,46 @@ func TestAnniversary(t *testing.T) {
 	}
 }
 
-func TestSort(t *testing.T) {
+func sortCheck(t *testing.T, raws []json.RawMessage, order partialdate.EraOrder) {
+	t.Helper()
 	var want []partialdate.Date
-	for _, raw := range loadCases(t).Sorted {
+	for _, raw := range raws {
 		want = append(want, parse(t, raw))
 	}
 	got := slices.Clone(want)
 	slices.Reverse(got)
 	slices.SortStableFunc(got, func(a, b partialdate.Date) int {
-		switch ka, kb := a.SortKey(), b.SortKey(); {
-		case ka < kb:
-			return -1
-		case ka > kb:
-			return 1
-		}
-		return 0
+		return strings.Compare(a.SortKey(order), b.SortKey(order))
 	})
 	if !slices.Equal(got, want) {
-		t.Fatalf("sorted %v, want %v", got, want)
+		t.Fatalf("order %q: sorted %v, want %v", order, got, want)
+	}
+}
+
+func TestSort(t *testing.T) {
+	c := loadCases(t)
+	sortCheck(t, c.Sorted, partialdate.EraOrder{})
+	sortCheck(t, c.SortedEras.Dates, partialdate.EraOrder{List: c.SortedEras.Eras, Reversed: c.SortedEras.Reversed})
+}
+
+func TestEraInDB(t *testing.T) {
+	d := partialdate.Date{Y: -500, M: 3, E: `Эра "Б", \x`}
+	v, err := d.Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back partialdate.Date
+	if err := back.Scan(v); err != nil || back != d {
+		t.Fatalf("%v → %v → %v %v", d, v, back, err)
+	}
+	// так PostgreSQL выводит запись: эра без спецсимволов — без кавычек
+	if err := back.Scan("(300,,,AC)"); err != nil || back != (partialdate.Date{Y: 300, E: "AC"}) {
+		t.Fatalf("unquoted era: %v %v", back, err)
+	}
+	if err := back.Scan(`(300,,,"")`); err == nil {
+		t.Fatal("empty era accepted")
+	}
+	if got := (partialdate.Date{Y: -500, E: "AC"}).String(); got != "-0500-??-?? AC" {
+		t.Fatalf("string %q", got)
 	}
 }

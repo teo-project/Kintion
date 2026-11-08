@@ -9,7 +9,8 @@ import type { GroupDTO } from '@/api/types'
 import KinIcon from '@/components/KinIcon.vue'
 import { errorText, fmt, t } from '@/i18n'
 
-const props = defineProps<{ d: string; ids: string[] }>()
+/** readonly — гость чужого дашборда (F-03): выделение есть, редактора групп нет */
+const props = defineProps<{ d: string; ids: string[]; readonly?: boolean }>()
 /** clear — снять выделение; changed — метки изменились (дерево перечитывается); groups — создана группа */
 const emit = defineEmits<{ clear: []; changed: []; groups: [] }>()
 
@@ -86,60 +87,62 @@ async function run(kind: 'add' | 'remove') {
         <KinIcon name="close" />
       </button>
     </div>
-    <select
-      v-model="group"
-      class="kin-input"
-      :aria-label="t.groups.choose"
-    >
-      <option
-        value=""
-        disabled
+    <template v-if="!readonly">
+      <select
+        v-model="group"
+        class="kin-input"
+        :aria-label="t.groups.choose"
       >
-        {{ t.groups.choose }}
-      </option>
-      <option
-        v-for="g in groups"
-        :key="g.id"
-        :value="g.id"
+        <option
+          value=""
+          disabled
+        >
+          {{ t.groups.choose }}
+        </option>
+        <option
+          v-for="g in groups"
+          :key="g.id"
+          :value="g.id"
+        >
+          {{ g.name }}
+        </option>
+        <option :value="NEW">
+          {{ t.tree.newGroup }}
+        </option>
+      </select>
+      <input
+        v-if="group === NEW"
+        v-model="newName"
+        class="kin-input"
+        :placeholder="t.groups.name"
+        :aria-label="t.groups.name"
       >
-        {{ g.name }}
-      </option>
-      <option :value="NEW">
-        {{ t.tree.newGroup }}
-      </option>
-    </select>
-    <input
-      v-if="group === NEW"
-      v-model="newName"
-      class="kin-input"
-      :placeholder="t.groups.name"
-      :aria-label="t.groups.name"
-    >
-    <button
-      class="kin-btn kin-btn--small"
-      type="button"
-      data-testid="sel-add"
-      :disabled="busy || !group || (group === NEW && !newName.trim())"
-      @click="run('add')"
-    >
-      {{ t.tree.addToGroup }}
-    </button>
-    <button
-      class="kin-btn kin-btn--small"
-      type="button"
-      data-testid="sel-remove"
-      :disabled="busy || !group || group === NEW"
-      @click="run('remove')"
-    >
-      {{ t.tree.removeFromGroup }}
-    </button>
-    <p
-      v-if="done"
-      class="kin-muted"
-      role="status"
-    >
-      {{ done }}
-    </p>
+      <button
+        class="kin-btn kin-btn--small"
+        type="button"
+        data-testid="sel-add"
+        :disabled="busy || !group || (group === NEW && !newName.trim())"
+        @click="run('add')"
+      >
+        {{ t.tree.addToGroup }}
+      </button>
+      <button
+        class="kin-btn kin-btn--small"
+        type="button"
+        data-testid="sel-remove"
+        :disabled="busy || !group || group === NEW"
+        @click="run('remove')"
+      >
+        {{ t.tree.removeFromGroup }}
+      </button>
+      <p
+        v-if="done"
+        class="kin-muted"
+        role="status"
+      >
+        {{ done }}
+      </p>
+    </template>
     <p
       v-if="error"
       class="kin-error"

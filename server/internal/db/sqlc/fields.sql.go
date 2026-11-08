@@ -96,6 +96,40 @@ func (q *Queries) InsertEntryLink(ctx context.Context, arg InsertEntryLinkParams
 	return i, err
 }
 
+const listCustomSectionsByTemplate = `-- name: ListCustomSectionsByTemplate :many
+SELECT DISTINCT (f->>'section')::text AS section
+FROM entity e, jsonb_array_elements(e.custom_fields) f
+WHERE e.dashboard_id = $1 AND e.template_id = $2 AND coalesce(f->>'section', '') <> ''
+ORDER BY 1
+`
+
+type ListCustomSectionsByTemplateParams struct {
+	DashboardID uuid.UUID
+	TemplateID  uuid.UUID
+}
+
+// Блоки, в которые записи шаблона в дашборде (в том числе в корзине) ставят
+// свои поля (F-139): общий блок с полями не удаляется.
+func (q *Queries) ListCustomSectionsByTemplate(ctx context.Context, arg ListCustomSectionsByTemplateParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listCustomSectionsByTemplate, arg.DashboardID, arg.TemplateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var section string
+		if err := rows.Scan(&section); err != nil {
+			return nil, err
+		}
+		items = append(items, section)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFieldEntriesByKey = `-- name: ListFieldEntriesByKey :many
 SELECT id, dashboard_id, entity_id, field_key, sort_key, v_text, v_num, v_date, v_bool, v_ref, meta, valid_from, valid_to, note, created_at, updated_at FROM field_entry WHERE entity_id = $1 AND field_key = $2 ORDER BY sort_key, id
 `
@@ -272,6 +306,40 @@ func (q *Queries) ListFieldTextsByTemplate(ctx context.Context, arg ListFieldTex
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecordSectionKeysByTemplate = `-- name: ListRecordSectionKeysByTemplate :many
+SELECT DISTINCT (s->>'key')::text AS key
+FROM entity e, jsonb_array_elements(e.custom_sections) s
+WHERE e.dashboard_id = $1 AND e.template_id = $2
+ORDER BY 1
+`
+
+type ListRecordSectionKeysByTemplateParams struct {
+	DashboardID uuid.UUID
+	TemplateID  uuid.UUID
+}
+
+// Ключи своих блоков записей шаблона в дашборде (в том числе в корзине):
+// новый общий блок не занимает ключ блока записи (F-139).
+func (q *Queries) ListRecordSectionKeysByTemplate(ctx context.Context, arg ListRecordSectionKeysByTemplateParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRecordSectionKeysByTemplate, arg.DashboardID, arg.TemplateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

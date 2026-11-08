@@ -20,7 +20,7 @@ services:
       TEO_KIN_LANGUAGE: ${TEO_KIN_LANGUAGE:-en}
       TEO_KIN_PACKS: ${TEO_KIN_PACKS:-kin.core}
       TEO_KIN_AUTH_MODE: ${TEO_KIN_AUTH_MODE:-local}
-      TEO_KIN_REGISTRATION: ${TEO_KIN_REGISTRATION:-closed}
+      TEO_KIN_REGISTRATION: ${TEO_KIN_REGISTRATION:-invite}
       TEO_KIN_UPLOAD_MAX_MB: ${TEO_KIN_UPLOAD_MAX_MB:-20}
       # in Compose this is a port only: it is used on both sides of "ports"
       TEO_KIN_HTTP_BIND: ${TEO_KIN_HTTP_BIND:-8080}

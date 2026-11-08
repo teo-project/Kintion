@@ -10,7 +10,7 @@ import { RouterLink } from 'vue-router'
 import { api } from '@/api/client'
 import type { GroupDTO } from '@/api/types'
 import { errorText, fmt, t } from '@/i18n'
-import { rememberDashboard } from '@/stores/dashboards'
+import { rememberDashboard, useDashboardsStore } from '@/stores/dashboards'
 import { ancestors, descendants } from '@/ui/groups'
 import { useGroups } from '@/ui/useGroups'
 import GroupPicker from '../components/GroupPicker.vue'
@@ -18,6 +18,9 @@ import KinCheckbox from '../components/KinCheckbox.vue'
 import KinIcon from '../components/KinIcon.vue'
 
 const props = defineProps<{ d: string }>()
+// гость чужого дашборда (F-03): группы только смотрит
+const dashboards = useDashboardsStore()
+const guest = computed(() => dashboards.isGuest(props.d))
 
 const state = computed(() => useGroups(props.d))
 const groups = computed(() => state.value.groups.value)
@@ -129,6 +132,7 @@ async function remove(g: GroupDTO) {
     </p>
 
     <form
+      v-if="!guest"
       class="kin-island create"
       @submit.prevent="create"
     >
@@ -190,6 +194,7 @@ async function remove(g: GroupDTO) {
             class="kin-muted count children-count"
           >{{ fmt(t.groups.childrenCount, { n: g.children.length }) }}</span>
           <PopoverRoot
+            v-if="!guest"
             :open="editing === g.id"
             @update:open="v => openEdit(g, v)"
           >

@@ -161,11 +161,10 @@ func TestEmptyYAML(t *testing.T) {
 	}
 }
 
-// Д-6: в 0.1 только local и closed; иное — ошибка старта с понятным текстом.
+// Д-6: вход пока только local; иное — ошибка старта с понятным текстом.
 func TestAuthModeUnsupported(t *testing.T) {
 	for k, v := range map[string]string{
-		"TEO_KIN_AUTH_MODE":    "oidc",
-		"TEO_KIN_REGISTRATION": "invite",
+		"TEO_KIN_AUTH_MODE": "oidc",
 	} {
 		_, err := LoadFrom(env(map[string]string{k: v}), files(nil))
 		if err == nil || !strings.Contains(err.Error(), "не поддерживается в 0.1") {

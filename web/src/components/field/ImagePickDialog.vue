@@ -2,6 +2,7 @@
 // Диалог загрузки изображения (F-107): вставка из буфера (Ctrl+V, пока диалог
 // открыт), перетаскивание файла в область диалога, выбор файла с диска.
 // Принимаются только изображения; остальное — понятная ошибка в диалоге.
+// any — любой файл (поле «Файл», KIN-27): без проверки типа.
 // Загрузку делает вызывающий (upload): успех закрывает диалог, ошибка
 // остаётся в нём; пока загрузка идёт, диалог не закрывается.
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
@@ -11,7 +12,7 @@ import { errorText, t } from '@/i18n'
 
 import KinIcon from '../KinIcon.vue'
 
-const props = defineProps<{ upload: (file: File) => Promise<void> }>()
+const props = defineProps<{ upload: (file: File) => Promise<void>; any?: boolean }>()
 const open = defineModel<boolean>('open', { required: true })
 
 /** форматы, которые принимает сервер (F-29) */
@@ -28,7 +29,7 @@ async function take(file: File | undefined, empty: string) {
     error.value = empty
     return
   }
-  if (!ACCEPT.includes(file.type)) {
+  if (!props.any && !ACCEPT.includes(file.type)) {
     error.value = t.photo.notImage
     return
   }
@@ -53,7 +54,7 @@ function firstFile(list: FileList | null | undefined): File | undefined {
 function onPaste(e: ClipboardEvent) {
   if (!open.value) return
   e.preventDefault()
-  void take(firstFile(e.clipboardData?.files), t.photo.noImageInClipboard)
+  void take(firstFile(e.clipboardData?.files), props.any ? t.file.noFileInClipboard : t.photo.noImageInClipboard)
 }
 
 function onDrop(e: DragEvent) {
@@ -92,7 +93,7 @@ onBeforeUnmount(() => document.removeEventListener('paste', onPaste))
     <DialogPortal>
       <DialogOverlay class="kin-overlay" />
       <DialogContent class="kin-dialog image-pick">
-        <DialogTitle>{{ t.photo.upload }}</DialogTitle>
+        <DialogTitle>{{ any ? t.file.upload : t.photo.upload }}</DialogTitle>
         <div
           class="drop"
           :class="{ over, busy }"
@@ -103,7 +104,7 @@ onBeforeUnmount(() => document.removeEventListener('paste', onPaste))
         >
           <KinIcon name="upload" />
           <DialogDescription class="kin-muted hint">
-            {{ t.photo.pickHint }}
+            {{ any ? t.file.pickHint : t.photo.pickHint }}
           </DialogDescription>
           <button
             class="kin-btn choose-file"
@@ -117,7 +118,7 @@ onBeforeUnmount(() => document.removeEventListener('paste', onPaste))
             ref="input"
             class="file"
             type="file"
-            :accept="ACCEPT.join(',')"
+            :accept="any ? undefined : ACCEPT.join(',')"
             :aria-label="t.photo.chooseFile"
             @change="onFile"
           >

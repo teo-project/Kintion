@@ -12,7 +12,7 @@ import (
 )
 
 const getDashboard = `-- name: GetDashboard :one
-SELECT id, owner_id, name, created_at, deleted_at FROM dashboard WHERE id = $1 AND deleted_at IS NULL
+SELECT id, owner_id, name, created_at, deleted_at, eras FROM dashboard WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetDashboard(ctx context.Context, id uuid.UUID) (Dashboard, error) {
@@ -24,12 +24,24 @@ func (q *Queries) GetDashboard(ctx context.Context, id uuid.UUID) (Dashboard, er
 		&i.Name,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Eras,
 	)
 	return i, err
 }
 
+const getDashboardEras = `-- name: GetDashboardEras :one
+SELECT eras FROM dashboard WHERE id = $1
+`
+
+func (q *Queries) GetDashboardEras(ctx context.Context, id uuid.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getDashboardEras, id)
+	var eras []byte
+	err := row.Scan(&eras)
+	return eras, err
+}
+
 const insertDashboard = `-- name: InsertDashboard :one
-INSERT INTO dashboard (id, owner_id, name) VALUES ($1, $2, $3) RETURNING id, owner_id, name, created_at, deleted_at
+INSERT INTO dashboard (id, owner_id, name) VALUES ($1, $2, $3) RETURNING id, owner_id, name, created_at, deleted_at, eras
 `
 
 type InsertDashboardParams struct {
@@ -47,6 +59,7 @@ func (q *Queries) InsertDashboard(ctx context.Context, arg InsertDashboardParams
 		&i.Name,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Eras,
 	)
 	return i, err
 }
@@ -125,7 +138,7 @@ func (q *Queries) ListDashboardTemplates(ctx context.Context, dashboardID uuid.U
 }
 
 const listDashboardsByOwner = `-- name: ListDashboardsByOwner :many
-SELECT id, owner_id, name, created_at, deleted_at FROM dashboard WHERE owner_id = $1 AND deleted_at IS NULL ORDER BY created_at, id
+SELECT id, owner_id, name, created_at, deleted_at, eras FROM dashboard WHERE owner_id = $1 AND deleted_at IS NULL ORDER BY created_at, id
 `
 
 func (q *Queries) ListDashboardsByOwner(ctx context.Context, ownerID uuid.UUID) ([]Dashboard, error) {
@@ -143,6 +156,7 @@ func (q *Queries) ListDashboardsByOwner(ctx context.Context, ownerID uuid.UUID) 
 			&i.Name,
 			&i.CreatedAt,
 			&i.DeletedAt,
+			&i.Eras,
 		); err != nil {
 			return nil, err
 		}
@@ -178,6 +192,58 @@ func (q *Queries) ListLiveDashboardIDs(ctx context.Context) ([]uuid.UUID, error)
 	return items, nil
 }
 
+const listUsedEras = `-- name: ListUsedEras :many
+WITH vis AS (SELECT en.id FROM entity en JOIN dashboard_template dt ON dt.id = en.template_id
+             WHERE en.dashboard_id = $1 AND dt.active AND en.deleted_at IS NULL)
+SELECT DISTINCT coalesce(x.e, '')::text AS era FROM (
+    SELECT (start_date).e AS e, (start_date).y AS y FROM entity WHERE entity.id IN (SELECT id FROM vis)
+    UNION ALL SELECT (end_date).e, (end_date).y FROM entity WHERE entity.id IN (SELECT id FROM vis)
+    UNION ALL SELECT (valid_from).e, (valid_from).y FROM participation
+        WHERE participation.container_id IN (SELECT id FROM vis) AND participation.entity_id IN (SELECT id FROM vis)
+    UNION ALL SELECT (valid_to).e, (valid_to).y FROM participation
+        WHERE participation.container_id IN (SELECT id FROM vis) AND participation.entity_id IN (SELECT id FROM vis)
+    UNION ALL SELECT (v_date).e, (v_date).y FROM field_entry WHERE field_entry.entity_id IN (SELECT id FROM vis)
+    UNION ALL SELECT (valid_from).e, (valid_from).y FROM field_entry WHERE field_entry.entity_id IN (SELECT id FROM vis)
+    UNION ALL SELECT (valid_to).e, (valid_to).y FROM field_entry WHERE field_entry.entity_id IN (SELECT id FROM vis)
+) x WHERE x.y IS NOT NULL OR x.e IS NOT NULL
+ORDER BY 1
+`
+
+// Эры, встречающиеся в датах дашборда (F-143): пустая — наша эра у датированных;
+// даты из одной эры — тоже. Только даты видимых записей — не в корзине, на
+// действующих шаблонах (F-07, F-60).
+func (q *Queries) ListUsedEras(ctx context.Context, dashboardID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listUsedEras, dashboardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var era string
+		if err := rows.Scan(&era); err != nil {
+			return nil, err
+		}
+		items = append(items, era)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockDashboardEras = `-- name: LockDashboardEras :one
+SELECT eras FROM dashboard WHERE id = $1 FOR UPDATE
+`
+
+// Эры для правки: строка дашборда заблокирована до конца транзакции (F-45).
+func (q *Queries) LockDashboardEras(ctx context.Context, id uuid.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, lockDashboardEras, id)
+	var eras []byte
+	err := row.Scan(&eras)
+	return eras, err
+}
+
 const lockDashboardTemplate = `-- name: LockDashboardTemplate :one
 SELECT id, dashboard_id, pack_id, template_key, entity, pack_version, overrides, active, rev FROM dashboard_template WHERE dashboard_id = $1 AND id = $2 FOR UPDATE
 `
@@ -205,7 +271,7 @@ func (q *Queries) LockDashboardTemplate(ctx context.Context, arg LockDashboardTe
 }
 
 const renameDashboard = `-- name: RenameDashboard :one
-UPDATE dashboard SET name = $2 WHERE id = $1 RETURNING id, owner_id, name, created_at, deleted_at
+UPDATE dashboard SET name = $2 WHERE id = $1 RETURNING id, owner_id, name, created_at, deleted_at, eras
 `
 
 type RenameDashboardParams struct {
@@ -222,6 +288,96 @@ func (q *Queries) RenameDashboard(ctx context.Context, arg RenameDashboardParams
 		&i.Name,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Eras,
+	)
+	return i, err
+}
+
+const replaceEra = `-- name: ReplaceEra :one
+WITH
+  vis AS (SELECT en.id FROM entity en JOIN dashboard_template dt ON dt.id = en.template_id
+             WHERE en.dashboard_id = $1 AND dt.active AND en.deleted_at IS NULL),
+  before AS (SELECT ((SELECT count(*) FROM entity WHERE entity.id IN (SELECT id FROM vis) AND pd_era_matches(start_date, $2::text))
+      + (SELECT count(*) FROM entity WHERE entity.id IN (SELECT id FROM vis) AND pd_era_matches(end_date, $2::text))
+      + (SELECT count(*) FROM participation WHERE participation.container_id IN (SELECT id FROM vis) AND participation.entity_id IN (SELECT id FROM vis) AND pd_era_matches(valid_from, $2::text))
+      + (SELECT count(*) FROM participation WHERE participation.container_id IN (SELECT id FROM vis) AND participation.entity_id IN (SELECT id FROM vis) AND pd_era_matches(valid_to, $2::text))
+      + (SELECT count(*) FROM field_entry WHERE field_entry.entity_id IN (SELECT id FROM vis) AND pd_era_matches(v_date, $2::text))
+      + (SELECT count(*) FROM field_entry WHERE field_entry.entity_id IN (SELECT id FROM vis) AND pd_era_matches(valid_from, $2::text))
+      + (SELECT count(*) FROM field_entry WHERE field_entry.entity_id IN (SELECT id FROM vis) AND pd_era_matches(valid_to, $2::text)))::bigint AS n),
+  e AS (UPDATE entity SET start_date = CASE WHEN pd_era_matches(start_date, $2::text) THEN pd_with_era(start_date, $3::text) ELSE start_date END,
+            end_date = CASE WHEN pd_era_matches(end_date, $2::text) THEN pd_with_era(end_date, $3::text) ELSE end_date END
+         WHERE entity.dashboard_id = $1 AND (pd_era_matches(start_date, $2::text) OR pd_era_matches(end_date, $2::text))
+         RETURNING entity.id, pd_era_matches(old.start_date, $2::text) AS s, pd_era_matches(old.end_date, $2::text) AS en),
+  p AS (UPDATE participation SET valid_from = CASE WHEN pd_era_matches(valid_from, $2::text) THEN pd_with_era(valid_from, $3::text) ELSE valid_from END,
+            valid_to = CASE WHEN pd_era_matches(valid_to, $2::text) THEN pd_with_era(valid_to, $3::text) ELSE valid_to END
+         WHERE participation.dashboard_id = $1 AND (pd_era_matches(valid_from, $2::text) OR pd_era_matches(valid_to, $2::text))
+         RETURNING participation.container_id, participation.entity_id, participation.role),
+  f AS (UPDATE field_entry SET v_date = CASE WHEN pd_era_matches(v_date, $2::text) THEN pd_with_era(v_date, $3::text) ELSE v_date END,
+            valid_from = CASE WHEN pd_era_matches(valid_from, $2::text) THEN pd_with_era(valid_from, $3::text) ELSE valid_from END,
+            valid_to = CASE WHEN pd_era_matches(valid_to, $2::text) THEN pd_with_era(valid_to, $3::text) ELSE valid_to END
+         WHERE field_entry.dashboard_id = $1 AND (pd_era_matches(v_date, $2::text) OR pd_era_matches(valid_from, $2::text) OR pd_era_matches(valid_to, $2::text))
+         RETURNING field_entry.entity_id, field_entry.field_key),
+  k AS (SELECT id AS entity_id, 'start'::text AS field_key FROM e WHERE s
+        UNION SELECT id, 'end' FROM e WHERE en
+        UNION SELECT container_id, 'participants:' || role FROM p WHERE p.entity_id IN (SELECT id FROM vis)
+        UNION SELECT entity_id, field_key FROM f),
+  b AS (INSERT INTO field_rev (entity_id, field_key, rev) SELECT entity_id, field_key, 1 FROM k
+        ON CONFLICT (entity_id, field_key) DO UPDATE SET rev = field_rev.rev + 1 RETURNING field_rev.entity_id)
+SELECT n AS changed, ARRAY(SELECT DISTINCT entity_id FROM b)::uuid[] AS touched FROM before
+`
+
+type ReplaceEraParams struct {
+	DashboardID uuid.UUID
+	OldEra      *string
+	NewEra      *string
+}
+
+type ReplaceEraRow struct {
+	Changed int64
+	Touched []uuid.UUID
+}
+
+// Замена эры во всех датах дашборда (F-143): даты с годом и эрой @old_era
+// (NULL — пустая) и даты из одной эры @old_era получают эру @new_era (NULL —
+// пустая); прочие не меняются. Дата из одной эры при замене на пустую
+// очищается (колонка NULL). Правила — pd_era_matches и pd_with_era (миграция
+// 0012). Одна строка — один UPDATE на таблицу (все её колонки-даты сразу).
+// Меняются все даты (и записей в корзине и неактивных шаблонов — вернутся
+// согласованными); число изменённых — по видимым записям (F-07), по снимку до
+// изменения.
+// Версии полей (F-45) повышаются в том же запросе — ровно у тех, что замена
+// действительно изменила (RETURNING old.*): правка, сохранённая параллельно,
+// либо видна замене и получает новую версию, либо не тронута. Ключи — как у
+// правки поля: start, end, participants:<роль> у контейнера, field_key у
+// значения. Версия роли — только по видимым участникам: скрытого карточка не
+// показывает, и 409 из-за его дат был бы запретом по невидимым данным (F-07).
+// touched — записи с новыми версиями: им updated_at отдельным запросом.
+func (q *Queries) ReplaceEra(ctx context.Context, arg ReplaceEraParams) (ReplaceEraRow, error) {
+	row := q.db.QueryRow(ctx, replaceEra, arg.DashboardID, arg.OldEra, arg.NewEra)
+	var i ReplaceEraRow
+	err := row.Scan(&i.Changed, &i.Touched)
+	return i, err
+}
+
+const setDashboardEras = `-- name: SetDashboardEras :one
+UPDATE dashboard SET eras = $2 WHERE id = $1 RETURNING id, owner_id, name, created_at, deleted_at, eras
+`
+
+type SetDashboardErasParams struct {
+	ID   uuid.UUID
+	Eras []byte
+}
+
+func (q *Queries) SetDashboardEras(ctx context.Context, arg SetDashboardErasParams) (Dashboard, error) {
+	row := q.db.QueryRow(ctx, setDashboardEras, arg.ID, arg.Eras)
+	var i Dashboard
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Eras,
 	)
 	return i, err
 }
@@ -264,6 +420,15 @@ func (q *Queries) ShareLockDashboardTemplate(ctx context.Context, arg ShareLockD
 		&i.Rev,
 	)
 	return i, err
+}
+
+const touchEntities = `-- name: TouchEntities :exec
+UPDATE entity SET updated_at = now() WHERE id = ANY ($1::uuid[])
+`
+
+func (q *Queries) TouchEntities(ctx context.Context, ids []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchEntities, ids)
+	return err
 }
 
 const updateDashboardTemplateOverrides = `-- name: UpdateDashboardTemplateOverrides :one

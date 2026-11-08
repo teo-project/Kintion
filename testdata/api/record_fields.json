@@ -1,7 +1,9 @@
 {
   "record": {
     "custom_fields": [],
+    "custom_sections": [],
     "deleted": false,
+    "editable": true,
     "end": null,
     "entity": "kin.core.person",
     "fields": {

@@ -56,15 +56,21 @@ type entitySnap struct {
 	TitleManual  *string           `json:"title_manual"`
 	Sensitive    bool              `json:"sensitive"`
 	CustomFields json.RawMessage   `json:"custom_fields"`
-	Deleted      bool              `json:"deleted"`
+	// CustomSections — свои блоки записи (F-139); в журнале — когда они есть.
+	CustomSections json.RawMessage `json:"custom_sections,omitempty"`
+	Deleted        bool            `json:"deleted"`
 }
 
 func snapEntity(r sqlc.Entity) entitySnap {
-	return entitySnap{
+	s := entitySnap{
 		ID: r.ID, Entity: r.Entity, TemplateID: r.TemplateID, StartDate: r.StartDate, StartLink: r.StartLink,
 		EndDate: r.EndDate, EndLink: r.EndLink, Note: r.Note, TitleManual: r.TitleManual, Sensitive: r.Sensitive,
 		CustomFields: r.CustomFields, Deleted: r.DeletedAt != nil,
 	}
+	if len(r.CustomSections) > 0 && string(r.CustomSections) != "[]" {
+		s.CustomSections = r.CustomSections
+	}
+	return s
 }
 
 func (t *Tx) auditEntity(op string, before, after *sqlc.Entity) error {
@@ -100,7 +106,8 @@ func (t *Tx) periodLink(self uuid.UUID, link uuid.UUID, field string) error {
 }
 
 // SystemPatch — PATCH /api/records/{id}: одно системное поле за запрос с
-// версией if_rev (F-45).
+// версией if_rev (F-45). Свои поля и свои блоки (F-139) — одно поле
+// custom_fields: их можно менять вместе (новое поле в новом блоке).
 type SystemPatch struct {
 	IfRev        *int64                 `json:"if_rev"`
 	Start        Opt[PeriodIn]          `json:"start"`
@@ -109,6 +116,8 @@ type SystemPatch struct {
 	TitleManual  Opt[string]            `json:"title_manual"`
 	Sensitive    Opt[bool]              `json:"sensitive"`
 	CustomFields Opt[[]json.RawMessage] `json:"custom_fields"`
+	// CustomSections — свои блоки записи (F-139), версия — та же, что у custom_fields.
+	CustomSections Opt[[]json.RawMessage] `json:"custom_sections"`
 }
 
 // key — ключ версии единственного поля запроса.
@@ -116,7 +125,7 @@ func (p SystemPatch) key() (string, error) {
 	var keys []string
 	for k, set := range map[string]bool{
 		RevStart: p.Start.Set, RevEnd: p.End.Set, RevNote: p.Note.Set, RevTitle: p.TitleManual.Set,
-		RevSensitive: p.Sensitive.Set, RevCustom: p.CustomFields.Set,
+		RevSensitive: p.Sensitive.Set, RevCustom: p.CustomFields.Set || p.CustomSections.Set,
 	} {
 		if set {
 			keys = append(keys, k)
@@ -134,7 +143,7 @@ type systemValue struct {
 	Value any   `json:"value"`
 }
 
-func (t *Tx) systemCurrent(r *Rec, key string) func() (any, error) {
+func (t *Tx) systemCurrent(r *Rec, key string, sections bool) func() (any, error) {
 	return func() (any, error) {
 		row, err := t.q.GetEntityByID(t.ctx, r.Row.ID)
 		if err != nil {
@@ -147,9 +156,9 @@ func (t *Tx) systemCurrent(r *Rec, key string) func() (any, error) {
 		var v any
 		switch key {
 		case RevStart:
-			v = period(row.StartDate, row.StartLink)
+			v = period(row.StartDate, t.seenLink(row.StartLink))
 		case RevEnd:
-			v = period(row.EndDate, row.EndLink)
+			v = period(row.EndDate, t.seenLink(row.EndLink))
 		case RevNote:
 			v = row.Note
 		case RevTitle:
@@ -158,6 +167,10 @@ func (t *Tx) systemCurrent(r *Rec, key string) func() (any, error) {
 			v = row.Sensitive
 		case RevCustom:
 			v = json.RawMessage(row.CustomFields)
+			// правка своих блоков (F-139): текущие и поля, и блоки — версия у них общая
+			if sections {
+				v = map[string]json.RawMessage{RevCustom: row.CustomFields, SectionsKey: row.CustomSections}
+			}
 		}
 		return systemValue{Rev: rev, Value: v}, nil
 	}
@@ -172,16 +185,20 @@ func (t *Tx) PatchSystem(r *Rec, p SystemPatch) (*Rec, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := t.lockRev(r.Row.ID, key, p.IfRev, t.systemCurrent(r, key)); err != nil {
+	if err := t.lockRev(r.Row.ID, key, p.IfRev, t.systemCurrent(r, key, p.CustomSections.Set)); err != nil {
 		return nil, err
 	}
 	row := r.Row
 	set := func(pi *PeriodIn, date **partialdate.Date, link **uuid.UUID, field string) error {
+		old := *date // прежняя дата: неизменённая не проверяется по пределам эры
 		*date, *link = nil, nil
 		if pi == nil || (pi.Value == nil && pi.Link == nil) {
 			return nil
 		}
 		if err := checkPeriod(r.Tmpl, field, field); err != nil {
+			return err
+		}
+		if err := t.checkEraYear(field, pi.Value, old); err != nil {
 			return err
 		}
 		*date = pi.Value
@@ -216,11 +233,23 @@ func (t *Tx) PatchSystem(r *Rec, p SystemPatch) (*Rec, error) {
 			row.Sensitive = *p.Sensitive.V
 		}
 	case RevCustom:
-		var list []json.RawMessage
-		if p.CustomFields.V != nil {
-			list = *p.CustomFields.V
+		if p.CustomFields.Set {
+			var list []json.RawMessage
+			if p.CustomFields.V != nil {
+				list = *p.CustomFields.V
+			}
+			row.CustomFields, err = t.customFields(r, list)
 		}
-		row.CustomFields, err = t.customFields(r, list)
+		if err == nil {
+			var sections *[]json.RawMessage
+			if p.CustomSections.Set {
+				sections = &[]json.RawMessage{}
+				if p.CustomSections.V != nil {
+					sections = p.CustomSections.V
+				}
+			}
+			row.CustomSections, err = t.recordSections(r, sections, row.CustomFields)
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -228,6 +257,7 @@ func (t *Tx) PatchSystem(r *Rec, p SystemPatch) (*Rec, error) {
 	nr, err := t.q.UpdateEntitySystem(t.ctx, sqlc.UpdateEntitySystemParams{
 		ID: row.ID, StartDate: row.StartDate, StartLink: row.StartLink, EndDate: row.EndDate, EndLink: row.EndLink,
 		Note: row.Note, TitleManual: row.TitleManual, Sensitive: row.Sensitive, CustomFields: row.CustomFields,
+		CustomSections: row.CustomSections,
 	})
 	if err != nil {
 		return nil, err
@@ -390,12 +420,16 @@ func (t *Tx) Create(b Batch, account uuid.UUID) (*BatchResult, error) {
 			if err := checkPeriod(tm, pd.key, field+"."+pd.key); err != nil {
 				return nil, err
 			}
+			if err := t.checkEraYear(field+"."+pd.key, pd.in.Value, nil); err != nil {
+				return nil, err
+			}
 			*pd.date = pd.in.Value
 		}
 		row, err := t.q.InsertEntity(t.ctx, p)
 		if err != nil {
 			return nil, err
 		}
+		t.adopt(row.ID)
 		res.Records = append(res.Records, &Rec{Row: row, Tmpl: tm})
 	}
 	// 2. привязки дат и описания свободных полей
@@ -425,6 +459,9 @@ func (t *Tx) Create(b Batch, account uuid.UUID) (*BatchResult, error) {
 		}
 		if len(n.CustomFields) > 0 {
 			cf, err := t.customFields(r, n.CustomFields)
+			if err == nil {
+				_, err = t.recordSections(r, nil, cf)
+			}
 			if err != nil {
 				var ve *ValidationError
 				if errors.As(err, &ve) {
@@ -438,6 +475,7 @@ func (t *Tx) Create(b Batch, account uuid.UUID) (*BatchResult, error) {
 			nr, err := t.q.UpdateEntitySystem(t.ctx, sqlc.UpdateEntitySystemParams{
 				ID: row.ID, StartDate: row.StartDate, StartLink: row.StartLink, EndDate: row.EndDate, EndLink: row.EndLink,
 				Note: row.Note, TitleManual: row.TitleManual, Sensitive: row.Sensitive, CustomFields: row.CustomFields,
+				CustomSections: row.CustomSections,
 			})
 			if err != nil {
 				return nil, err

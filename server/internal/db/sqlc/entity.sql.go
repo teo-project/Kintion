@@ -87,7 +87,7 @@ func (q *Queries) GetDashboardTemplate(ctx context.Context, arg GetDashboardTemp
 }
 
 const getEntity = `-- name: GetEntity :one
-SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by FROM entity WHERE dashboard_id = $1 AND id = $2
+SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections FROM entity WHERE dashboard_id = $1 AND id = $2
 `
 
 type GetEntityParams struct {
@@ -116,12 +116,13 @@ func (q *Queries) GetEntity(ctx context.Context, arg GetEntityParams) (Entity, e
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.CustomSections,
 	)
 	return i, err
 }
 
 const getEntityByID = `-- name: GetEntityByID :one
-SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by FROM entity WHERE id = $1
+SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections FROM entity WHERE id = $1
 `
 
 func (q *Queries) GetEntityByID(ctx context.Context, id uuid.UUID) (Entity, error) {
@@ -145,6 +146,7 @@ func (q *Queries) GetEntityByID(ctx context.Context, id uuid.UUID) (Entity, erro
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.CustomSections,
 	)
 	return i, err
 }
@@ -153,7 +155,7 @@ const insertEntity = `-- name: InsertEntity :one
 INSERT INTO entity (id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link,
                     note, title_manual, sensitive, custom_fields, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by
+RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections
 `
 
 type InsertEntityParams struct {
@@ -207,6 +209,7 @@ func (q *Queries) InsertEntity(ctx context.Context, arg InsertEntityParams) (Ent
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.CustomSections,
 	)
 	return i, err
 }
@@ -275,7 +278,7 @@ func (q *Queries) InsertFieldEntry(ctx context.Context, arg InsertFieldEntryPara
 }
 
 const listEntitiesByIDs = `-- name: ListEntitiesByIDs :many
-SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by FROM entity WHERE dashboard_id = $1 AND id = ANY ($2::uuid[])
+SELECT id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections FROM entity WHERE dashboard_id = $1 AND id = ANY ($2::uuid[])
 `
 
 type ListEntitiesByIDsParams struct {
@@ -310,6 +313,7 @@ func (q *Queries) ListEntitiesByIDs(ctx context.Context, arg ListEntitiesByIDsPa
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.DeletedBy,
+			&i.CustomSections,
 		); err != nil {
 			return nil, err
 		}
@@ -628,21 +632,22 @@ func (q *Queries) TouchEntity(ctx context.Context, id uuid.UUID) error {
 const updateEntitySystem = `-- name: UpdateEntitySystem :one
 UPDATE entity
 SET start_date = $2, start_link = $3, end_date = $4, end_link = $5, note = $6,
-    title_manual = $7, sensitive = $8, custom_fields = $9, updated_at = now()
+    title_manual = $7, sensitive = $8, custom_fields = $9, custom_sections = $10, updated_at = now()
 WHERE id = $1
-RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by
+RETURNING id, dashboard_id, entity, template_id, start_date, start_link, end_date, end_link, note, title_manual, sensitive, custom_fields, created_by, created_at, updated_at, deleted_at, deleted_by, custom_sections
 `
 
 type UpdateEntitySystemParams struct {
-	ID           uuid.UUID
-	StartDate    *partialdate.Date
-	StartLink    *uuid.UUID
-	EndDate      *partialdate.Date
-	EndLink      *uuid.UUID
-	Note         *string
-	TitleManual  *string
-	Sensitive    bool
-	CustomFields []byte
+	ID             uuid.UUID
+	StartDate      *partialdate.Date
+	StartLink      *uuid.UUID
+	EndDate        *partialdate.Date
+	EndLink        *uuid.UUID
+	Note           *string
+	TitleManual    *string
+	Sensitive      bool
+	CustomFields   []byte
+	CustomSections []byte
 }
 
 // Системные поля записи: одна запись строки целиком (сервис меняет одно поле).
@@ -657,6 +662,7 @@ func (q *Queries) UpdateEntitySystem(ctx context.Context, arg UpdateEntitySystem
 		arg.TitleManual,
 		arg.Sensitive,
 		arg.CustomFields,
+		arg.CustomSections,
 	)
 	var i Entity
 	err := row.Scan(
@@ -677,6 +683,7 @@ func (q *Queries) UpdateEntitySystem(ctx context.Context, arg UpdateEntitySystem
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.CustomSections,
 	)
 	return i, err
 }

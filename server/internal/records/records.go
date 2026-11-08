@@ -22,6 +22,7 @@ import (
 	"kintion/server/internal/dashboards"
 	"kintion/server/internal/db/sqlc"
 	"kintion/server/internal/packs"
+	"kintion/server/internal/partialdate"
 )
 
 // Ошибки сервиса.
@@ -104,8 +105,28 @@ type Tx struct {
 	q         *sqlc.Queries
 	op        *audit.Operation
 	Dashboard uuid.UUID
-	tmpls     map[uuid.UUID]*Tmpl // nil — шаблон неактивен или не загружен (F-60)
+	tmpls     map[uuid.UUID]*Tmpl  // nil — шаблон неактивен или не загружен (F-60)
+	eraOrder  partialdate.EraOrder // порядок эр дашборда для сортировки по датам (F-143)
+	// эры дашборда для проверки пределов года (checkEraYear), читаются по требованию
+	eras       dashboards.Eras
+	erasLoaded bool
+	// scope — записи, видимые гостю (F-05), groups — видимые гостю группы
+	// (выдачи и вложенные, F-105, без его технической группы); nil — смотрит владелец
+	scope  map[uuid.UUID]bool
+	groups map[uuid.UUID]bool
+	// гость-редактор (F-04): editScope — записи с меткой группы, где у гостя
+	// право правки; editGroups — показанные гостю группы с правом правки;
+	// guest — сам гость, ownGroup — его техническая группа (F-149), найденная в
+	// этой транзакции (ownGroupID)
+	editScope  map[uuid.UUID]bool
+	editGroups map[uuid.UUID]bool
+	guest      uuid.UUID
+	ownGroup   *uuid.UUID
 }
+
+// ErrForbidden — запись видна, но изменять её смотрящему нельзя (гость без
+// права правки на её группы, F-04). Невидимое — по-прежнему ErrNotFound.
+var ErrForbidden = errors.New("нет права на изменение")
 
 // Begin начинает работу с дашбордом в транзакции tx. op может быть nil для чтения.
 func (s *Service) Begin(ctx context.Context, tx pgx.Tx, op *audit.Operation, dashboard uuid.UUID) (*Tx, error) {
@@ -116,6 +137,74 @@ func (s *Service) Begin(ctx context.Context, tx pgx.Tx, op *audit.Operation, das
 func (s *Service) Read(ctx context.Context, q *sqlc.Queries, dashboard uuid.UUID) (*Tx, error) {
 	return s.begin(ctx, q, nil, dashboard)
 }
+
+// ReadAs — чтение глазами смотрящего: гостю видны только записи из групп с
+// выдачей и вложенных в них (F-05); всё остальное ведёт себя как несуществующее (F-07).
+func (s *Service) ReadAs(ctx context.Context, q *sqlc.Queries, acc authz.Access) (*Tx, error) {
+	return s.as(ctx, q, nil, acc)
+}
+
+// BeginAs — изменение глазами смотрящего в транзакции tx: гость видит и
+// меняет только своё по правам (F-04, F-05).
+func (s *Service) BeginAs(ctx context.Context, tx pgx.Tx, op *audit.Operation, acc authz.Access) (*Tx, error) {
+	return s.as(ctx, sqlc.New(tx), op, acc)
+}
+
+func (s *Service) as(ctx context.Context, q *sqlc.Queries, op *audit.Operation, acc authz.Access) (*Tx, error) {
+	t, err := s.begin(ctx, q, op, acc.Dashboard.ID)
+	if err != nil || acc.Owner {
+		return t, err
+	}
+	t.guest = acc.Account
+	t.groups, t.editGroups = map[uuid.UUID]bool{}, map[uuid.UUID]bool{}
+	var all, edit []uuid.UUID
+	for id, canEdit := range acc.Groups {
+		all = append(all, id)
+		if canEdit {
+			edit = append(edit, id)
+		}
+		if acc.Own[id] {
+			continue // своя техническая группа гостю не показывается (F-149)
+		}
+		t.groups[id] = true
+		if canEdit {
+			t.editGroups[id] = true
+		}
+	}
+	t.scope, t.editScope = map[uuid.UUID]bool{}, map[uuid.UUID]bool{}
+	for _, x := range []struct {
+		ids []uuid.UUID
+		out map[uuid.UUID]bool
+	}{{all, t.scope}, {edit, t.editScope}} {
+		if len(x.ids) == 0 {
+			continue
+		}
+		ents, err := q.EntitiesInGroups(ctx, sqlc.EntitiesInGroupsParams{DashboardID: acc.Dashboard.ID, GroupIds: x.ids})
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ents {
+			x.out[id] = true
+		}
+	}
+	return t, nil
+}
+
+// CanEdit — смотрящий может изменять запись: владелец — любую, гость — с меткой
+// группы, где у него право правки (F-04).
+func (t *Tx) CanEdit(id uuid.UUID) bool { return t.editScope == nil || t.editScope[id] }
+
+// GroupEditable — смотрящий может ставить и снимать метку группы.
+func (t *Tx) GroupEditable(id uuid.UUID) bool { return t.editGroups == nil || t.editGroups[id] }
+
+// Guest — смотрит гость: видит часть дашборда.
+func (t *Tx) Guest() bool { return t.scope != nil }
+
+// inScope — запись видна смотрящему по группам (владельцу — любая).
+func (t *Tx) inScope(id uuid.UUID) bool { return t.scope == nil || t.scope[id] }
+
+// GroupVisible — группа видна смотрящему (владельцу — любая).
+func (t *Tx) GroupVisible(id uuid.UUID) bool { return t.groups == nil || t.groups[id] }
 
 func (s *Service) begin(ctx context.Context, q *sqlc.Queries, op *audit.Operation, dashboard uuid.UUID) (*Tx, error) {
 	t := &Tx{s: s, ctx: ctx, q: q, op: op, Dashboard: dashboard, tmpls: map[uuid.UUID]*Tmpl{}}
@@ -129,6 +218,9 @@ func (s *Service) begin(ctx context.Context, q *sqlc.Queries, op *audit.Operatio
 			return nil, err
 		}
 		t.tmpls[r.ID] = tm
+	}
+	if t.eraOrder, err = dashboards.OrderOf(ctx, q, dashboard); err != nil {
+		return nil, err
 	}
 	return t, nil
 }
@@ -165,13 +257,13 @@ func (s *Service) resolve(r sqlc.DashboardTemplate) (*Tmpl, error) {
 
 // visible — запись видна: не в корзине и на действующем шаблоне.
 func (t *Tx) visible(row sqlc.Entity) bool {
-	return row.DeletedAt == nil && t.tmpls[row.TemplateID] != nil
+	return row.DeletedAt == nil && t.tmpls[row.TemplateID] != nil && t.inScope(row.ID)
 }
 
 // Record — запись с шаблоном; запись в корзине тоже (её видит владелец),
-// запись неактивного шаблона — ErrNotFound (F-60).
+// запись неактивного шаблона или невидимая гостю — ErrNotFound (F-60, F-05).
 func (t *Tx) Record(row sqlc.Entity) (*Rec, error) {
-	if row.DashboardID != t.Dashboard {
+	if row.DashboardID != t.Dashboard || !t.inScope(row.ID) || (t.Guest() && row.DeletedAt != nil) {
 		return nil, ErrNotFound
 	}
 	tm := t.tmpls[row.TemplateID]
@@ -205,6 +297,38 @@ func (t *Tx) visibleRows(ids []uuid.UUID) (map[uuid.UUID]sqlc.Entity, error) {
 		}
 	}
 	return out, nil
+}
+
+// FileVisible — файл sha — значение поля типа image или file видимой
+// смотрящему записи (F-30, F-05): текст, совпавший с хешем, доступа не даёт.
+func (t *Tx) FileVisible(sha string) (bool, error) {
+	used, err := t.q.FileUsedBy(t.ctx, sqlc.FileUsedByParams{DashboardID: t.Dashboard, VText: &sha})
+	if err != nil {
+		return false, err
+	}
+	ids := make([]uuid.UUID, 0, len(used))
+	for _, u := range used {
+		ids = append(ids, u.EntityID)
+	}
+	rows, err := t.visibleRows(ids)
+	if err != nil {
+		return false, err
+	}
+	for _, u := range used {
+		row, ok := rows[u.EntityID]
+		if !ok {
+			continue
+		}
+		r, err := t.Record(row)
+		if err != nil {
+			continue
+		}
+		d, err := t.fieldDef(r, u.FieldKey)
+		if err == nil && (d.Type == packs.TypeImage || d.Type == packs.TypeFile) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // target — видимая запись дашборда по id (цель ссылки, привязки, участник).

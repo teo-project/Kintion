@@ -1,14 +1,13 @@
 // Проверка «пакам — данные» (план §3 п.7): в рабочем коде web/src нет строк
 // с id и ключами паков — ни kin.*, ни ключей полей, ролей, этапов, шаблонов
-// и сущностей. Разрешены только системные ключи. src/demo — не рабочий код:
-// демо-сборка на снимке seed-demo.sh (знает его записи), в обычную сборку не входит.
+// и сущностей. Разрешены только системные ключи.
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 import { ruFiles } from './__tests__/kit'
 import type { TemplateDef } from './types'
 
-const sources = import.meta.glob(['../**/*.ts', '../**/*.vue', '!../**/*.test.ts', '!../**/__tests__/**', '!../demo/**'], {
+const sources = import.meta.glob(['../**/*.ts', '../**/*.vue', '!../**/*.test.ts', '!../**/__tests__/**'], {
   eager: true, import: 'default', query: '?raw',
 }) as Record<string, string>
 

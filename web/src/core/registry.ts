@@ -3,7 +3,7 @@
 // ключа пака в коде (F-52, план §3 п.7).
 
 import type { DateWords } from './dates'
-import type { EntityDef, PeriodBoundDef, RecordDTO, SchemaDTO, SchemaTemplateDTO, TemplateDef } from './types'
+import type { EntityDef, ErasDTO, PeriodBoundDef, RecordDTO, SchemaDTO, SchemaTemplateDTO, TemplateDef } from './types'
 
 export interface Registry {
   language: string
@@ -12,7 +12,14 @@ export interface Registry {
   templates: Map<string, SchemaTemplateDTO>
   /** по id строки dashboard_template */
   byRowId: Map<string, SchemaTemplateDTO>
+  /** эры дашборда (F-143) */
+  eras: ErasDTO
+  /** растёт, когда даты дашборда меняются целиком (замена эры): экраны перечитывают данные */
+  dataRev: number
 }
+
+/** Эры по умолчанию: эру не показывать и не менять, наша эра, порядок — по умолчанию. */
+export const DEFAULT_ERAS: ErasDTO = { show: false, edit: false, default: '', order: [], today: null, rev: 0, list: [''] }
 
 export function buildRegistry(schema: SchemaDTO): Registry {
   const reg: Registry = {
@@ -20,6 +27,8 @@ export function buildRegistry(schema: SchemaDTO): Registry {
     entities: new Map(),
     templates: new Map(),
     byRowId: new Map(),
+    eras: schema.eras ?? DEFAULT_ERAS,
+    dataRev: 0,
   }
   for (const e of schema.entities) reg.entities.set(e.id, e)
   for (const t of schema.templates) {

@@ -51,7 +51,7 @@ function setStatus(v: 'idle' | 'saved' | 'error') {
   if (v === 'saved') timer = setTimeout(() => (status.value = 'idle'), SAVED_MS)
 }
 
-const changed = computed(() => !sameValue(draft.value, props.value))
+const changed = computed(() => !sameValue(draft.value, props.value, props.def.type))
 
 watch(() => props.value, v => {
   if (!focused.value && !busy.value) draft.value = v ?? null
@@ -105,7 +105,7 @@ async function settle() {
   busy.value = true
   let res: SaveResult
   try {
-    res = await props.save(normalize(draft.value))
+    res = await props.save(normalize(draft.value, props.def.type))
   } finally {
     busy.value = false
   }
@@ -152,6 +152,7 @@ const text = computed(() => (draft.value == null ? '' : String(draft.value)))
       :label="undefined"
       @update:model-value="v => (draft = v)"
       @keydown.enter.prevent="commit"
+      @popup="onPopup"
     />
     <textarea
       v-else-if="multiline"
@@ -191,12 +192,14 @@ const text = computed(() => (draft.value == null ? '' : String(draft.value)))
   border-radius: var(--kin-radius);
 }
 
-.cell--dirty :deep(.kin-input) {
+.cell--dirty :deep(.kin-input),
+.cell--dirty :deep(.pdate .field:not(.invalid)) {
   background-color: var(--kin-color-dirty-soft);
   border-color: var(--kin-color-dirty);
 }
 
-.cell--saved :deep(.kin-input) {
+.cell--saved :deep(.kin-input),
+.cell--saved :deep(.pdate .field:not(.invalid)) {
   animation: cell-saved 3s ease-in forwards;
 }
 
@@ -204,7 +207,8 @@ const text = computed(() => (draft.value == null ? '' : String(draft.value)))
   animation: cell-shake 0.5s ease-in-out;
 }
 
-.cell--error :deep(.kin-input) {
+.cell--error :deep(.kin-input),
+.cell--error :deep(.pdate .field) {
   background-color: var(--kin-color-danger-soft);
   border-color: var(--kin-color-danger);
 }

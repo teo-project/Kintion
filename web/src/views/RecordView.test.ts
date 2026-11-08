@@ -273,3 +273,110 @@ describe('новая запись — черновик до первого по�
     expect(calls.filter(c => c.url.startsWith('/api/records'))).toHaveLength(0)
   })
 })
+
+describe('карточка: свои блоки (F-139)', () => {
+  it('новое поле в новом блоке — одним PATCH; поле в блоке шаблона; пустой блок — в правке, убирается', async () => {
+    let current = envelope(liza)
+    const calls = serve((m, u, body) => {
+      if (m === 'GET' && u === '/api/records/liza') return [200, { record: current, related: {} }]
+      if (m === 'PATCH' && u === '/api/records/liza') {
+        const b = body as { custom_fields?: RecordDTO['custom_fields']; custom_sections?: RecordDTO['custom_sections'] }
+        current = {
+          ...current,
+          custom_fields: b.custom_fields ?? current.custom_fields,
+          custom_sections: b.custom_sections ?? current.custom_sections,
+        }
+        return [200, { record: current, related: {} }]
+      }
+      return undefined
+    })
+    const w = await mountRecord('liza', true)
+    const open = async (sel: string) => {
+      await w.find(sel).trigger('click')
+      await flushPromises()
+    }
+    const set = (name: string, v: string) => {
+      const el = document.body.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLSelectElement
+      el.value = v
+      el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input'))
+    }
+    const submit = async () => {
+      ;(document.body.querySelector('.kin-popover form') as HTMLFormElement).dispatchEvent(new Event('submit'))
+      await flushPromises()
+    }
+
+    await open('.add-custom')
+    set('custom-name', 'Unit')
+    set('custom-section', ':new')
+    await flushPromises()
+    set('custom-section-name', 'Война')
+    await flushPromises()
+    await submit()
+    const patch = calls.filter(c => c.method === 'PATCH').at(-1)!
+    const body = patch.body as { custom_fields: { section?: string }[]; custom_sections: { key: string; name: string }[] }
+    expect(body.custom_sections).toHaveLength(1)
+    expect(body.custom_sections[0]).toMatchObject({ name: 'Война', key: expect.stringMatching(/^[a-z0-9_]+$/) })
+    expect(body.custom_fields[0]).toMatchObject({ key: 'unit', name: 'Unit', section: body.custom_sections[0]!.key })
+    const titles = () => w.findAll('.section-title').map(x => x.text())
+    expect(titles()).toContain('Война')
+    expect(titles().indexOf('Война')).toBeGreaterThan(titles().indexOf(messagesFor('ru').sections.additional))
+
+    // поле — в «Дополнительные» (блок шаблона): блок «Война» пуст, но в правке виден
+    const row = w.findAll('.field-row').find(r => r.find('.label').text() === 'Unit')!
+    await row.find('[aria-label^="Поле"]').trigger('click')
+    await flushPromises()
+    set('custom-section', 'additional')
+    await flushPromises()
+    await submit()
+    expect((calls.filter(c => c.method === 'PATCH').at(-1)!.body as { custom_fields: { section?: string }[] }).custom_fields[0]!.section)
+      .toBe('additional')
+    expect(titles()).toContain('Война')
+    // пустой блок убирается
+    await w.find('.section-edit').trigger('click')
+    await flushPromises()
+    ;(document.body.querySelector('.kin-popover .kin-ibtn--danger') as HTMLButtonElement).click()
+    await flushPromises()
+    expect((calls.filter(c => c.method === 'PATCH').at(-1)!.body as { custom_sections: unknown[] }).custom_sections).toEqual([])
+    expect(titles()).not.toContain('Война')
+  })
+})
+
+describe('карточка: поля быстрой формы дашборда в правке (F-124)', () => {
+  it('поле и дата из quick_fields дашборда стоят на форме сразу, даже пустые; в чтении — скрыты', async () => {
+    const tpl = schema.templates.find(x => x.key === 'kin.core.person')!
+    const before = tpl.definition
+    // переопределение дашборда: в быстрой форме ещё «Отчество» и дата смерти
+    tpl.definition = { ...before, quick_fields: [...(before.quick_fields ?? []), 'patronymic', 'end', 'deceased'] }
+    try {
+      serve((m, u) => (m === 'GET' && u === '/api/records/liza' ? [200, { record: envelope(liza), related: {} }] : undefined))
+      const labels = (w: Awaited<ReturnType<typeof mountRecord>>) => w.findAll('.field-row .label').map(x => x.text())
+      const sysLabels = (w: Awaited<ReturnType<typeof mountRecord>>) => w.findAll('.sys-row .label').map(x => x.text())
+      const read = await mountRecord('liza')
+      expect(labels(read)).not.toContain('Отчество')
+      expect(sysLabels(read)).not.toContain('Дата смерти')
+      read.unmount()
+      const w = await mountRecord('liza', true)
+      const row = w.findAll('.field-row').find(r => r.find('.label').text() === 'Отчество')!
+      expect(row.find('input').exists()).toBe(true)
+      expect(labels(w)).toContain('Умер') // признак завершения (F-126) из быстрой формы — тоже сразу
+      expect(labels(w)).not.toContain('Второе имя') // не в быстрой форме — по-прежнему за «Добавить»
+      expect(sysLabels(w)).toContain('Дата смерти')
+      // «Добавить» не предлагает то, что уже стоит на форме
+      await w.find('.add-field').trigger('click')
+      await flushPromises()
+      const offered = [...document.body.querySelectorAll('.add-list button')].map(b => b.textContent?.trim())
+      expect(offered).toContain('Второе имя')
+      expect(offered).not.toContain('Отчество')
+      // и «Добавить дату» не нужна: дата смерти и «Умер» уже на форме, других скрытых дат нет
+      expect(w.find('.add-date').exists()).toBe(false)
+      // вышли из правки — пустое снова скрыто
+      await w.find('.mode').trigger('click')
+      await flushPromises()
+      expect(labels(w)).not.toContain('Отчество')
+      expect(sysLabels(w)).not.toContain('Дата смерти')
+      expect(labels(w)).not.toContain('Умер')
+    } finally {
+      tpl.definition = before
+    }
+  })
+})

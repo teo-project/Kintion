@@ -6,7 +6,7 @@ import { ref, shallowRef } from 'vue'
 import { api } from '@/api/client'
 import type { DashboardDTO } from '@/api/types'
 import { buildRegistry, type Registry } from '@/core/registry'
-import type { SchemaTemplateDTO } from '@/core/types'
+import type { ErasDTO, SchemaTemplateDTO } from '@/core/types'
 
 const lastKey = 'kintion.dashboard'
 
@@ -87,6 +87,17 @@ export const useDashboardsStore = defineStore('dashboards', () => {
     list.value = list.value.map(x => (x.id === id ? d : x))
   }
 
+  /** Дашборд чужой — смотрящий в нём гость (F-03): только просмотр. */
+  function isGuest(id: string): boolean {
+    return list.value.find(x => x.id === id)?.guest === true
+  }
+
+  /** В дашборде можно создавать записи: свой или гость с правом правки (F-148). */
+  function canCreate(id: string): boolean {
+    const d = list.value.find(x => x.id === id)
+    return !d?.guest || d.can_edit === true
+  }
+
   /** Дашборд, с которого начать: последний открытый, иначе первый. */
   function initial(): DashboardDTO | undefined {
     const last = lastDashboard()
@@ -136,10 +147,22 @@ export const useDashboardsStore = defineStore('dashboards', () => {
     return next
   }
 
+  /**
+   * Эры дашборда после сохранения (F-143); replaced — даты изменены заменой эры:
+   * dataRev растёт, экраны перечитывают данные.
+   */
+  function setEras(d: string, reg: Registry, eras: ErasDTO, replaced: boolean): Registry {
+    const base = loadedRegs.value.get(d) ?? reg
+    const next: Registry = { ...base, eras, dataRev: base.dataRev + (replaced ? 1 : 0) }
+    registries.set(d, Promise.resolve(next))
+    put(d, next)
+    return next
+  }
+
   /** Сбросить кеш реестра дашборда (конфликт версии шаблона): следующий registry() перечитает. */
   function forget(d: string) {
     registries.delete(d)
   }
 
-  return { list, loaded, load, create, rename, initial, registry, current, replaceTemplate, forget }
+  return { list, loaded, load, create, rename, isGuest, canCreate, initial, registry, current, replaceTemplate, setEras, forget }
 })

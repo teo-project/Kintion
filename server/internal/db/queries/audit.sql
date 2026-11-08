@@ -11,7 +11,8 @@ SELECT * FROM audit_log WHERE dashboard_id = $1 ORDER BY at, id;
 
 -- name: ListAuditOperations :many
 -- Страница операций журнала дашборда, новые сверху; курсор — (время, операция)
--- последней операции предыдущей страницы. Фильтр по записи включает и участия
+-- последней операции предыдущей страницы; hidden_objects — объекты, которых
+-- смотрящему не показывают (гостю — дела владельца), до разбивки на страницы. Фильтр по записи включает и участия
 -- записи в чужих контейнерах (entity_id участника лежит в снимке).
 WITH hits AS (
     SELECT a.operation_id, max(a.at)::timestamptz AS last_at
@@ -24,6 +25,7 @@ WITH hits AS (
       AND (sqlc.narg(actor)::uuid IS NULL OR a.actor_id = sqlc.narg(actor)::uuid)
       AND (NOT sqlc.arg(system_only)::bool OR a.actor_id IS NULL)
       AND (sqlc.narg(op)::text IS NULL OR a.op = sqlc.narg(op)::text)
+      AND NOT (a.object = ANY (sqlc.arg(hidden_objects)::text[]))
     GROUP BY a.operation_id
 )
 SELECT operation_id, last_at FROM hits
@@ -45,6 +47,7 @@ WHERE a.dashboard_id = sqlc.arg(dashboard_id)::uuid
   AND (sqlc.narg(actor)::uuid IS NULL OR a.actor_id = sqlc.narg(actor)::uuid)
   AND (NOT sqlc.arg(system_only)::bool OR a.actor_id IS NULL)
   AND (sqlc.narg(op)::text IS NULL OR a.op = sqlc.narg(op)::text)
+  AND NOT (a.object = ANY (sqlc.arg(hidden_objects)::text[]))
 ORDER BY a.at, a.id;
 
 -- Снимки записей и их значений на момент очистки (purge пишет последнее

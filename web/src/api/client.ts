@@ -1,12 +1,16 @@
 // Клиент API: fetch, CSRF-токен сессии в заголовке (Д-13), JSON, ошибки.
 // 401 на защищённом методе — сессии нет: зовётся обработчик (переход ко входу).
 
-import type { BatchIn, FieldDef, SchemaTemplateDTO } from '@/core/types'
+import type { BatchIn, CustomSectionDef, ErasDTO, ErasSettings, FieldDef, SchemaTemplateDTO } from '@/core/types'
 
 import type {
   AddParticipantIn, AddValueIn, AuditOut, AuditQuery, DashboardDTO, ErrorBody, FileDTO, GroupDTO, GroupIn, ListOut, ListQuery, MeDTO,
   OperationOut, PatchParticipantIn, PatchValueIn, PrefsDTO, RecordOut, SchemaDTO, SetupStatusDTO, SystemPatchIn, TreeOut,
+  AccountDTO, AdminAccountDTO, InvitationDTO, InviteDTO, MemberDTO, RegisterStatusDTO,
 } from './types'
+
+/** замена эры во всех датах дашборда (F-143) */
+export interface EraReplace { from: string; to: string }
 
 export const CSRF_HEADER = 'X-Kintion-CSRF'
 
@@ -126,6 +130,32 @@ export const api = {
   me: () => request<MeDTO>('GET', '/api/me', { quiet401: true }),
   changePassword: (current: string, next: string) =>
     request<void>('POST', '/api/me/password', { body: { current, new: next } }),
+  setNick: (nick: string) => request<AccountDTO>('PUT', '/api/me/nick', { body: { nick } }),
+  registerStatus: (token?: string) =>
+    request<RegisterStatusDTO>('GET', `/api/register${query({ token })}`, { quiet401: true }),
+  register: (body: { token?: string; login: string; password: string; nick: string }) =>
+    request<MeDTO>('POST', '/api/register', { body, quiet401: true }),
+
+  /** гости дашборда и их права (владелец, F-03) */
+  members: (d: string) => request<MemberDTO[]>('GET', `/api/dashboards/${enc(d)}/members`),
+  putGrant: (d: string, body: { nick?: string; account_id?: string; group_id: string; can_edit: boolean }) =>
+    request<MemberDTO[]>('PUT', `/api/dashboards/${enc(d)}/grants`, { body }),
+  deleteGrant: (d: string, g: string, acc: string) =>
+    request<MemberDTO[]>('DELETE', `/api/dashboards/${enc(d)}/grants/${enc(g)}/${enc(acc)}`),
+  deleteMember: (d: string, acc: string) => request<MemberDTO[]>('DELETE', `/api/dashboards/${enc(d)}/members/${enc(acc)}`),
+  invitations: () => request<InvitationDTO[]>('GET', '/api/invitations'),
+  acceptInvitation: (d: string) => request<void>('POST', `/api/invitations/${enc(d)}/accept`),
+  declineInvitation: (d: string) => request<void>('POST', `/api/invitations/${enc(d)}/decline`),
+
+  /** админ инстанса: аккаунты и приглашения на инстанс (F-28) */
+  adminAccounts: () => request<AdminAccountDTO[]>('GET', '/api/admin/accounts'),
+  adminCreateAccount: (body: { login: string; password: string; nick: string }) =>
+    request<AdminAccountDTO>('POST', '/api/admin/accounts', { body }),
+  /** ссылки-приглашения: в invite — админ, в invite-all — любой (свои) */
+  invites: () => request<InviteDTO[]>('GET', '/api/invites'),
+  createInvite: () => request<InviteDTO>('POST', '/api/invites'),
+  deleteInvite: (id: string) => request<void>('DELETE', `/api/invites/${enc(id)}`),
+
   prefs: () => request<PrefsDTO>('GET', '/api/me/prefs'),
   setPrefs: (p: PrefsDTO) => request<PrefsDTO>('PUT', '/api/me/prefs', { body: p }),
 
@@ -133,10 +163,15 @@ export const api = {
   createDashboard: (title: string) => request<DashboardDTO>('POST', '/api/dashboards', { body: { name: title } }),
   renameDashboard: (d: string, title: string) =>
     request<DashboardDTO>('PATCH', `/api/dashboards/${enc(d)}`, { body: { name: title } }),
-  /** Ð½Ð°Ð±Ð¾Ñ Ð¿Ð¾Ð»ÐµÐ¹ Ð±ÑÑÑÑÐ¾Ð¹ ÑÐ¾ÑÐ¼Ñ ÑÐ°Ð±Ð»Ð¾Ð½Ð° Ð² Ð´Ð°ÑÐ±Ð¾ÑÐ´Ðµ (F-124); Ð¿ÑÑÑÐ¾ â Ð¿Ð¾ ÑÐ¼Ð¾Ð»ÑÐ°Ð½Ð¸Ñ Ð¿Ð°ÐºÐ° */
+  /** Набор полей быстрой формы шаблона в дашборде (F-124); пусто — по умолчанию пака */
   putQuickFields: (d: string, tmpl: string, body: { if_rev: number; quick_fields: string[] }) =>
     request<SchemaTemplateDTO>('PUT', `/api/dashboards/${enc(d)}/templates/${enc(tmpl)}/quick_fields`, { body }),
   schema: (d: string) => request<SchemaDTO>('GET', `/api/dashboards/${enc(d)}/schema`),
+  /** эры дашборда с действующим списком (F-143) */
+  eras: (d: string) => request<ErasDTO>('GET', `/api/dashboards/${enc(d)}/eras`),
+  /** эры дашборда (F-143); replace — замена эры во всех датах («к уже созданным», переименование), одна или список по порядку */
+  putEras: (d: string, body: { if_rev: number; eras: ErasSettings; replace?: EraReplace | EraReplace[] }) =>
+    request<ErasDTO>('PUT', `/api/dashboards/${enc(d)}/eras`, { body }),
   records: (d: string, q: ListQuery) => request<ListOut>('GET', `/api/dashboards/${enc(d)}/records${query(q)}`),
   /** ракурс «Дерево» (F-110): отношения с tree_link и их участники; group — с подгруппами */
   tree: (d: string, group?: string) => request<TreeOut>('GET', `/api/dashboards/${enc(d)}/tree${query({ group })}`),
@@ -154,7 +189,7 @@ export const api = {
   restoreRecord: (id: string) => request<RecordOut>('POST', `/api/records/${enc(id)}/restore`),
   purgeRecord: (id: string) => request<void>('DELETE', `/api/records/${enc(id)}/purge`),
   /** общие свои поля шаблона в дашборде целиком (F-96) */
-  putSharedFields: (d: string, tmpl: string, body: { if_rev: number; custom_fields: FieldDef[] }) =>
+  putSharedFields: (d: string, tmpl: string, body: { if_rev: number; custom_fields: FieldDef[]; custom_sections?: CustomSectionDef[] }) =>
     request<SchemaTemplateDTO>('PUT', `/api/dashboards/${enc(d)}/templates/${enc(tmpl)}/custom_fields`, { body }),
   patchRecord: (id: string, patch: SystemPatchIn) =>
     request<RecordOut>('PATCH', `/api/records/${enc(id)}`, { body: patch }),
@@ -181,10 +216,11 @@ export const api = {
   setGroups: (id: string, ifRev: number, groups: string[]) =>
     request<RecordOut>('PUT', `/api/records/${enc(id)}/groups`, { body: { if_rev: ifRev, groups } }),
 
-  uploadFile(d: string, file: Blob): Promise<FileDTO> {
+  /** загрузка: изображение; any — любой файл (поле «Файл», KIN-27) */
+  uploadFile(d: string, file: Blob, any = false): Promise<FileDTO> {
     const form = new FormData()
     form.append('file', file)
-    return request<FileDTO>('POST', `/api/dashboards/${enc(d)}/files`, { form })
+    return request<FileDTO>('POST', `/api/dashboards/${enc(d)}/files${any ? '?any=1' : ''}`, { form })
   },
   fileUrl: (d: string, sha: string) => `/api/files/${enc(d)}/${enc(sha)}`,
 

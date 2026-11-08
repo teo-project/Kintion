@@ -4,7 +4,7 @@
 // testdata/api/*.json (types.test.ts).
 
 import type {
-  Anchor, BatchIn, FieldDef, PartialDate, PeriodIn, RecordDTO, SchemaDTO,
+  Anchor, BatchIn, CustomSectionDef, FieldDef, PartialDate, PeriodIn, RecordDTO, SchemaDTO,
 } from '@/core/types'
 
 export type { BatchIn, RecordDTO, SchemaDTO }
@@ -12,7 +12,54 @@ export type { BatchIn, RecordDTO, SchemaDTO }
 export interface AccountDTO {
   id: string
   login: string
+  /** ник — адрес для приглашений (F-03) */
+  nick: string | null
   is_admin: boolean
+}
+
+/** Режим регистрации (F-28) и годность приглашения по ссылке. */
+export interface RegisterStatusDTO {
+  mode: 'open' | 'invite' | 'invite-all' | 'closed'
+  invite_valid: boolean
+}
+
+/** Право гостя на группу (F-03). */
+export interface GrantDTO {
+  group_id: string
+  can_edit: boolean
+}
+
+/** Гость дашборда: принял ли приглашение, права на группы. */
+export interface MemberDTO {
+  account_id: string
+  nick: string | null
+  login: string
+  invited_at: string
+  accepted: boolean
+  grants: GrantDTO[]
+  /** техническая группа гостя (F-149): правка на неё — право создавать записи */
+  own_group: string | null
+}
+
+/** Приглашение в чужой дашборд, ждущее ответа. */
+export interface InvitationDTO {
+  dashboard_id: string
+  name: string
+  owner_nick: string | null
+  invited_at: string
+}
+
+/** Аккаунт в списке админа. */
+export interface AdminAccountDTO extends AccountDTO {
+  created_at: string
+}
+
+/** Приглашение на инстанс; token — только в ответе на создание. */
+export interface InviteDTO {
+  id: string
+  created_at: string
+  expires_at: string
+  token?: string
 }
 
 /** Ответ /api/setup, /api/login, /api/me: аккаунт и CSRF-токен сессии (Д-13). */
@@ -51,6 +98,11 @@ export interface DashboardDTO {
   id: string
   name: string
   created_at: string
+  /** чужой дашборд, где аккаунт — гость (F-03) */
+  guest?: boolean
+  owner_nick?: string | null
+  /** можно создавать и править: свой дашборд или у гостя есть право правки (F-148) */
+  can_edit?: boolean
 }
 
 /** Связанные записи для подписей: замыкание на 2 шага (Д-12). */
@@ -102,6 +154,8 @@ export interface GroupDTO {
   /** автодобавление записей по фамилии (F-122) */
   auto_surname: boolean
   surnames: string[]
+  /** смотрящий может ставить и снимать метку (гость — только группы с правкой, F-148) */
+  editable?: boolean
 }
 
 /** Тело ответа с ошибкой: общая, проверки поля (`field`) или конфликт версии (`current`, F-45). */
@@ -156,6 +210,8 @@ export interface SystemPatchIn {
   title_manual?: string | null
   sensitive?: boolean
   custom_fields?: FieldDef[]
+  /** свои блоки записи (F-139) — вместе с custom_fields, одна версия */
+  custom_sections?: CustomSectionDef[]
 }
 
 /** Участник контейнера: в конец роли или на место (F-45 — версия роли). */

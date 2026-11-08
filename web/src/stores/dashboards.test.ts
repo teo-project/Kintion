@@ -30,3 +30,17 @@ describe('общий реестр дашборда', () => {
     expect(quick(await s.registry('d1'))).toEqual(['name'])
   })
 })
+
+describe('чужие дашборды (F-03)', () => {
+  it('isGuest — по признаку guest из списка', async () => {
+    setActivePinia(createPinia())
+    serve((m, u) => (m === 'GET' && u === '/api/dashboards'
+      ? [200, [{ id: 'mine', name: 'Мой', created_at: '' }, { id: 'his', name: 'Его', created_at: '', guest: true, owner_nick: 'papa' }]]
+      : undefined))
+    const s = useDashboardsStore()
+    await s.load()
+    expect(s.isGuest('mine')).toBe(false)
+    expect(s.isGuest('his')).toBe(true)
+    expect(s.isGuest('unknown')).toBe(false)
+  })
+})

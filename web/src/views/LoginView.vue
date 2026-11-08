@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AuthShell from '@/components/auth/AuthShell.vue'
 import AuthSubmit from '@/components/auth/AuthSubmit.vue'
 import PasswordInput from '@/components/auth/PasswordInput.vue'
+import { api } from '@/api/client'
 import { errorText, t } from '@/i18n'
 import { useSessionStore } from '@/stores/session'
 
@@ -16,6 +17,15 @@ const login = ref('')
 const password = ref('')
 const error = ref('')
 const busy = ref(false)
+// ссылка на регистрацию — только когда она открыта для всех (F-28)
+const canRegister = ref(false)
+onMounted(async () => {
+  try {
+    canRegister.value = (await api.registerStatus()).mode === 'open'
+  } catch {
+    // без ответа — без ссылки
+  }
+})
 
 /** Куда вернуться после входа: только путь этого приложения. */
 function nextPath(): string {
@@ -72,5 +82,21 @@ async function submit() {
         :busy="busy"
       />
     </form>
+    <RouterLink
+      v-if="canRegister"
+      class="auth-link"
+      :to="{ name: 'register' }"
+    >
+      {{ t.sharing.registerLink }}
+    </RouterLink>
   </AuthShell>
 </template>
+
+<style scoped>
+.auth-link {
+  display: block;
+  margin-top: 16px;
+  text-align: center;
+  font-size: var(--kin-font-small);
+}
+</style>
